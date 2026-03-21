@@ -131,7 +131,7 @@ export default function Library({ supabase, onOpenBook }: LibraryProps) {
           color: '#1A1917',
           letterSpacing: '-0.3px',
         }}>Loci</span>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
           <button
             type="button"
             onClick={() => fileInputRef.current?.click()}
@@ -139,27 +139,36 @@ export default function Library({ supabase, onOpenBook }: LibraryProps) {
             style={{
               display: 'inline-flex',
               alignItems: 'center',
-              gap: 8,
-              background: '#1A1917',
-              color: '#FFFFFF',
-              border: 'none',
-              borderRadius: 999,
-              padding: '10px 20px 10px 18px',
+              gap: 7,
+              background: isUploading ? 'rgba(26,25,23,0.04)' : 'transparent',
+              color: '#1A1917',
+              border: '1.5px solid rgba(26,25,23,0.22)',
+              borderRadius: 8,
+              padding: '7px 14px',
               fontFamily: '"DM Sans", system-ui, sans-serif',
               fontSize: 13,
               fontWeight: 600,
               letterSpacing: '-0.01em',
               cursor: isUploading ? 'not-allowed' : 'pointer',
-              opacity: isUploading ? 0.65 : 1,
-              boxShadow: '0 1px 2px rgba(0,0,0,0.06), 0 6px 20px rgba(26,25,23,0.18)',
-              transition: 'box-shadow 180ms ease, opacity 180ms ease, filter 180ms ease',
+              opacity: isUploading ? 0.5 : 1,
+              transition: 'background 140ms ease, border-color 140ms ease, opacity 140ms ease',
+            }}
+            onMouseEnter={(e) => {
+              if (!isUploading) {
+                e.currentTarget.style.background = 'rgba(26,25,23,0.05)'
+                e.currentTarget.style.borderColor = 'rgba(26,25,23,0.4)'
+              }
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = 'transparent'
+              e.currentTarget.style.borderColor = 'rgba(26,25,23,0.22)'
             }}
           >
             {isUploading ? (
               'Uploading…'
             ) : (
               <>
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.25" strokeLinecap="round" aria-hidden>
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" aria-hidden>
                   <path d="M12 5v14M5 12h14" />
                 </svg>
                 Add book
@@ -384,6 +393,8 @@ function ContinueBanner({
   readingSeconds: number
 }) {
   const [hovered, setHovered] = useState(false)
+  const [detailHovered, setDetailHovered] = useState(false)
+
   return (
     <div style={{ marginBottom: 44 }}>
       <p style={{
@@ -395,74 +406,73 @@ function ContinueBanner({
         textTransform: 'uppercase',
         margin: '0 0 12px',
       }}>Continue reading</p>
+
       <div
-        onMouseEnter={() => setHovered(true)}
-        onMouseLeave={() => setHovered(false)}
         style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: 16,
-          maxWidth: 560,
-          padding: '16px 18px 16px 16px',
-          borderRadius: 14,
-          background: 'linear-gradient(145deg, #FFFFFF 0%, #FAF9F7 55%, #F5F3EF 100%)',
-          border: '1px solid rgba(26,25,23,0.08)',
-          boxShadow: hovered
-            ? '0 1px 2px rgba(0,0,0,0.04), 0 16px 48px rgba(26,25,23,0.1)'
-            : '0 1px 2px rgba(0,0,0,0.04), 0 8px 28px rgba(26,25,23,0.06)',
-          transition: 'box-shadow 220ms ease, transform 220ms ease',
-          transform: hovered && !opening ? 'translateY(-1px)' : 'none',
+          position: 'relative',
+          display: 'inline-flex',
+          maxWidth: 500,
+          width: '100%',
         }}
+        onMouseEnter={() => setHovered(true)}
+        onMouseLeave={() => { setHovered(false) }}
       >
+        {/* Primary action — open the book */}
         <button
           type="button"
           disabled={opening}
           onClick={onOpen}
-          aria-label={opening ? undefined : `Resume reading ${book.title}`}
+          aria-label={`Resume reading ${book.title}`}
           style={{
             flex: 1,
             minWidth: 0,
             display: 'flex',
             alignItems: 'center',
             gap: 18,
-            padding: 0,
-            margin: 0,
-            border: 'none',
-            background: 'none',
+            padding: '18px 52px 18px 18px',
+            borderRadius: 12,
+            border: '1px solid rgba(26,25,23,0.08)',
+            background: '#FFFFFF',
             cursor: opening ? 'default' : 'pointer',
             textAlign: 'left',
             font: 'inherit',
             color: 'inherit',
+            boxShadow: hovered && !opening
+              ? '0 2px 4px rgba(0,0,0,0.04), 0 12px 36px rgba(26,25,23,0.09)'
+              : '0 1px 3px rgba(0,0,0,0.05), 0 4px 16px rgba(26,25,23,0.05)',
+            transform: hovered && !opening ? 'translateY(-1px)' : 'translateY(0)',
+            transition: 'box-shadow 200ms ease, transform 200ms ease',
           }}
         >
+          {/* Cover */}
           <div style={{
-            position: 'relative',
             flexShrink: 0,
-            borderRadius: 6,
+            borderRadius: 5,
             overflow: 'hidden',
-            boxShadow: '0 4px 14px rgba(0,0,0,0.12), 0 0 0 1px rgba(0,0,0,0.06)',
+            boxShadow: '0 3px 10px rgba(0,0,0,0.14), 0 0 0 1px rgba(0,0,0,0.06)',
           }}>
             {book.coverUrl ? (
               <img
                 src={book.coverUrl}
                 alt=""
-                style={{ width: 52, height: 78, objectFit: 'cover', display: 'block' }}
+                style={{ width: 48, height: 72, objectFit: 'cover', display: 'block' }}
               />
             ) : (
               <div style={{
-                width: 52,
-                height: 78,
+                width: 48,
+                height: 72,
                 background: 'linear-gradient(160deg, #E8E4DC, #D8D4CD)',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
               }}>
-                <span style={{ fontSize: 22, opacity: 0.5 }} aria-hidden>📖</span>
+                <span style={{ fontSize: 20, opacity: 0.4 }} aria-hidden>📖</span>
               </div>
             )}
           </div>
 
-          <div style={{ minWidth: 0, flex: 1, paddingRight: 8 }}>
+          {/* Metadata */}
+          <div style={{ minWidth: 0, flex: 1 }}>
             <div style={{
               fontFamily: '"Lora", Georgia, serif',
               fontSize: 15,
@@ -473,6 +483,7 @@ function ContinueBanner({
               WebkitLineClamp: 2,
               WebkitBoxOrient: 'vertical',
               overflow: 'hidden',
+              marginBottom: 5,
             }}>{book.title}</div>
             {book.author && (
               <div style={{
@@ -480,20 +491,17 @@ function ContinueBanner({
                 fontSize: 12,
                 fontWeight: 500,
                 color: '#6B6560',
-                marginTop: 5,
                 lineHeight: 1.4,
                 display: '-webkit-box',
-                WebkitLineClamp: 2,
+                WebkitLineClamp: 1,
                 WebkitBoxOrient: 'vertical',
                 overflow: 'hidden',
-                wordBreak: 'break-word',
               }}>{book.author}</div>
             )}
             {readingSeconds > 0 && (
               <div style={{
                 fontFamily: '"DM Sans", system-ui, sans-serif',
                 fontSize: 11,
-                fontWeight: 500,
                 color: '#B0ADA8',
                 marginTop: 6,
                 letterSpacing: '0.02em',
@@ -503,45 +511,56 @@ function ContinueBanner({
             )}
           </div>
 
-          <span
+          {/* Right chevron — signals card is navigable */}
+          <svg
+            width="16" height="16"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke={hovered && !opening ? '#C4A882' : 'rgba(26,25,23,0.2)'}
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
             style={{
               flexShrink: 0,
-              fontFamily: '"DM Sans", system-ui, sans-serif',
-              fontSize: 12,
-              fontWeight: 600,
-              letterSpacing: '0.04em',
-              color: opening ? '#8A8680' : '#C4A882',
-              padding: '10px 4px 10px 12px',
+              marginRight: 4,
+              transition: 'stroke 200ms ease',
             }}
+            aria-hidden
           >
-            {opening ? 'Opening…' : 'Resume →'}
-          </span>
+            <path d="M9 18l6-6-6-6" />
+          </svg>
         </button>
 
+        {/* Details button — positioned absolutely so it doesn't affect card layout */}
         {!opening && (
           <button
             type="button"
             onClick={() => onDetail()}
-            aria-label="Book details and study"
+            onMouseEnter={() => setDetailHovered(true)}
+            onMouseLeave={() => setDetailHovered(false)}
+            aria-label="Book details"
             style={{
+              position: 'absolute',
+              top: 10,
+              right: 10,
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              flexShrink: 0,
-              width: 40,
-              height: 40,
-              borderRadius: 10,
-              background: 'rgba(26,25,23,0.04)',
+              width: 28,
+              height: 28,
+              borderRadius: 7,
+              background: detailHovered ? 'rgba(26,25,23,0.07)' : 'rgba(26,25,23,0.04)',
               border: '1px solid rgba(26,25,23,0.08)',
               cursor: 'pointer',
-              color: '#6B6560',
-              transition: 'background 150ms ease, border-color 150ms ease, color 150ms ease',
+              color: detailHovered ? '#1A1917' : '#8A8680',
+              transition: 'background 140ms ease, color 140ms ease',
+              opacity: hovered || detailHovered ? 1 : 0.55,
             }}
           >
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
-              <circle cx="5" cy="12" r="2" />
-              <circle cx="12" cy="12" r="2" />
-              <circle cx="19" cy="12" r="2" />
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
+              <circle cx="5" cy="12" r="1.8" />
+              <circle cx="12" cy="12" r="1.8" />
+              <circle cx="19" cy="12" r="1.8" />
             </svg>
           </button>
         )}
