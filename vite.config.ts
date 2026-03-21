@@ -4,6 +4,11 @@ import tailwindcss from '@tailwindcss/vite'
 
 export default defineConfig({
   plugins: [react(), tailwindcss()],
+  server: {
+    watch: {
+      ignored: ['**/test-results/**', '**/.playwright-mcp/**'],
+    },
+  },
   define: {
     global: 'globalThis',
   },

@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import type { NavItem } from 'epubjs'
 import type { Annotation } from '../services/annotationService'
+import type { Bookmark } from '../services/bookmarkService'
 
 interface SidebarProps {
   toc: NavItem[]
@@ -11,6 +12,8 @@ interface SidebarProps {
   onClose: () => void
   annotations?: Annotation[]
   onDeleteAnnotation?: (id: string) => void
+  bookmarks?: Bookmark[]
+  onDeleteBookmark?: (id: string) => void
 }
 
 interface TocItemProps {
@@ -186,6 +189,83 @@ function AnnotationCard({
   )
 }
 
+function BookmarkRow({
+  bookmark,
+  isActive,
+  onNavigate,
+  onDelete,
+}: {
+  bookmark: Bookmark
+  isActive: boolean
+  onNavigate: (href: string) => void
+  onDelete: (id: string) => void
+}) {
+  const [hovered, setHovered] = useState(false)
+
+  return (
+    <div
+      onClick={() => onNavigate(bookmark.href)}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      style={{
+        padding: '10px 16px',
+        borderBottom: '1px solid var(--border)',
+        borderLeft: isActive ? '2px solid var(--accent-warm)' : '2px solid transparent',
+        cursor: 'pointer',
+        background: hovered ? 'var(--bg-secondary)' : 'transparent',
+        transition: 'background 100ms ease',
+        position: 'relative',
+      }}
+    >
+      <div
+        style={{
+          fontFamily: 'var(--font-ui)',
+          fontSize: 13,
+          fontWeight: isActive ? 500 : 400,
+          color: isActive ? 'var(--text-primary)' : 'var(--text-secondary)',
+          paddingRight: 20,
+        }}
+      >
+        {bookmark.label}
+      </div>
+      <div
+        style={{
+          fontFamily: 'var(--font-ui)',
+          fontSize: 11,
+          color: 'var(--text-tertiary)',
+          marginTop: 2,
+        }}
+      >
+        {new Date(bookmark.createdAt).toLocaleDateString()}
+      </div>
+      {hovered && (
+        <button
+          onClick={(e) => {
+            e.stopPropagation()
+            onDelete(bookmark.id)
+          }}
+          aria-label="Remove bookmark"
+          style={{
+            position: 'absolute',
+            top: 8,
+            right: 10,
+            background: 'none',
+            border: 'none',
+            color: 'var(--text-tertiary)',
+            cursor: 'pointer',
+            fontSize: 16,
+            lineHeight: 1,
+            padding: 2,
+            borderRadius: 4,
+          }}
+        >
+          ×
+        </button>
+      )}
+    </div>
+  )
+}
+
 export default function Sidebar({
   toc,
   isOpen,
@@ -194,17 +274,19 @@ export default function Sidebar({
   onClose,
   annotations = [],
   onDeleteAnnotation,
+  bookmarks = [],
+  onDeleteBookmark,
 }: SidebarProps) {
-  const [activeTab, setActiveTab] = useState<'contents' | 'notes'>('contents')
+  const [activeTab, setActiveTab] = useState<'contents' | 'notes' | 'bookmarks'>('contents')
   const sortedAnnotations = [...annotations].sort((a, b) => b.createdAt - a.createdAt)
 
-  const tabStyle = (tab: 'contents' | 'notes'): React.CSSProperties => ({
+  const tabStyle = (tab: 'contents' | 'notes' | 'bookmarks'): React.CSSProperties => ({
     flex: 1,
     border: 'none',
     background: activeTab === tab ? 'var(--bg-secondary)' : 'transparent',
     color: activeTab === tab ? 'var(--text-primary)' : 'var(--text-secondary)',
     fontFamily: 'var(--font-ui)',
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: activeTab === tab ? 600 : 400,
     cursor: 'pointer',
     padding: '6px 0',
@@ -293,6 +375,14 @@ export default function Sidebar({
                   >
                     Notes{annotations.length > 0 ? ` (${annotations.length})` : ''}
                   </button>
+                  <button
+                    role="tab"
+                    aria-selected={activeTab === 'bookmarks'}
+                    style={tabStyle('bookmarks')}
+                    onClick={() => setActiveTab('bookmarks')}
+                  >
+                    Saved{bookmarks.length > 0 ? ` (${bookmarks.length})` : ''}
+                  </button>
                 </div>
                 <button
                   onClick={onClose}
@@ -372,6 +462,37 @@ export default function Sidebar({
                         onClose()
                       }}
                       onDelete={(id) => onDeleteAnnotation?.(id)}
+                    />
+                  ))
+                )}
+              </div>
+            )}
+            {/* Bookmarks tab */}
+            {activeTab === 'bookmarks' && (
+              <div style={{ flex: 1, overflowY: 'auto' }}>
+                {bookmarks.length === 0 ? (
+                  <p
+                    style={{
+                      padding: '16px',
+                      color: 'var(--text-tertiary)',
+                      fontFamily: 'var(--font-ui)',
+                      fontSize: 13,
+                      lineHeight: 1.6,
+                    }}
+                  >
+                    No bookmarks yet. Use the bookmark button in the reader to save your place.
+                  </p>
+                ) : (
+                  bookmarks.map((b) => (
+                    <BookmarkRow
+                      key={b.id}
+                      bookmark={b}
+                      isActive={b.href.split('#')[0] === currentHref.split('#')[0]}
+                      onNavigate={(href) => {
+                        onNavigate(href)
+                        onClose()
+                      }}
+                      onDelete={(id) => onDeleteBookmark?.(id)}
                     />
                   ))
                 )}

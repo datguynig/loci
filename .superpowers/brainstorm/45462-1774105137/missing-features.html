@@ -1,0 +1,102 @@
+<h2>What's Missing from Loci?</h2>
+<p class="subtitle">Select the features you want to prioritise. I'll factor these into the plan.</p>
+
+<div style="margin-bottom: 24px;">
+  <h3 style="font-size: 13px; text-transform: uppercase; letter-spacing: 0.5px; color: #888; margin-bottom: 12px">📚 Library (unlocked by backend)</h3>
+  <div class="options" data-multiselect style="gap: 8px;">
+    <div class="option" data-choice="library-screen" onclick="toggleSelect(this)">
+      <div class="letter">★</div>
+      <div class="content">
+        <h3>Book library screen</h3>
+        <p>Replaces the current drop-zone landing. Shows your shelf with covers, titles, last-read date. Click to open, button to upload new.</p>
+      </div>
+    </div>
+    <div class="option" data-choice="progress-sync" onclick="toggleSelect(this)">
+      <div class="letter">★</div>
+      <div class="content">
+        <h3>Reading progress sync</h3>
+        <p>Resume where you left off on any device. Syncs current chapter, scroll position, and TTS sentence.</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div style="margin-bottom: 24px;">
+  <h3 style="font-size: 13px; text-transform: uppercase; letter-spacing: 0.5px; color: #888; margin-bottom: 12px">🎧 TTS improvements</h3>
+  <div class="options" data-multiselect style="gap: 8px;">
+    <div class="option" data-choice="cross-chapter-tts" onclick="toggleSelect(this)">
+      <div class="letter" style="font-size:11px">TTS</div>
+      <div class="content">
+        <h3>Continuous playback across chapters</h3>
+        <p>TTS currently stops at the end of each chapter. Auto-advance to the next chapter and keep playing.</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div style="margin-bottom: 24px;">
+  <h3 style="font-size: 13px; text-transform: uppercase; letter-spacing: 0.5px; color: #888; margin-bottom: 12px">📖 Reader experience</h3>
+  <div class="options" data-multiselect style="gap: 8px;">
+    <div class="option" data-choice="bookmarks" onclick="toggleSelect(this)">
+      <div class="letter">🔖</div>
+      <div class="content">
+        <h3>Bookmarks</h3>
+        <p>One-click bookmark any page — no text selection needed. Listed in the sidebar alongside notes.</p>
+      </div>
+    </div>
+    <div class="option" data-choice="search" onclick="toggleSelect(this)">
+      <div class="letter">🔍</div>
+      <div class="content">
+        <h3>Search within book</h3>
+        <p>Ctrl+F opens a search bar. Matches highlighted in text, jump to next/prev result.</p>
+      </div>
+    </div>
+    <div class="option" data-choice="font-selection" onclick="toggleSelect(this)">
+      <div class="letter">Aa</div>
+      <div class="content">
+        <h3>Font selection</h3>
+        <p>Toggle between serif (Lora, current) and sans-serif (DM Sans) for the reading body text.</p>
+      </div>
+    </div>
+    <div class="option" data-choice="sepia" onclick="toggleSelect(this)">
+      <div class="letter">🌅</div>
+      <div class="content">
+        <h3>Sepia theme</h3>
+        <p>A third theme option between light and dark. Warm off-white background, easy on the eyes for long sessions.</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div style="margin-bottom: 24px;">
+  <h3 style="font-size: 13px; text-transform: uppercase; letter-spacing: 0.5px; color: #888; margin-bottom: 12px">📤 Data & export</h3>
+  <div class="options" data-multiselect style="gap: 8px;">
+    <div class="option" data-choice="export-notes" onclick="toggleSelect(this)">
+      <div class="letter">↗</div>
+      <div class="content">
+        <h3>Export annotations</h3>
+        <p>Download all notes for a book as markdown or plain text. Useful for Obsidian, Notion, etc.</p>
+      </div>
+    </div>
+    <div class="option" data-choice="reading-stats" onclick="toggleSelect(this)">
+      <div class="letter">📊</div>
+      <div class="content">
+        <h3>Reading stats</h3>
+        <p>Track time spent reading and pages per session. Show on the library screen or a stats panel.</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div>
+  <h3 style="font-size: 13px; text-transform: uppercase; letter-spacing: 0.5px; color: #888; margin-bottom: 12px">📱 Mobile</h3>
+  <div class="options" data-multiselect style="gap: 8px;">
+    <div class="option" data-choice="swipe" onclick="toggleSelect(this)">
+      <div class="letter">👆</div>
+      <div class="content">
+        <h3>Swipe gestures</h3>
+        <p>Swipe left/right to turn pages on mobile. Currently only keyboard and button navigation works on touch devices.</p>
+      </div>
+    </div>
+  </div>
+</div>

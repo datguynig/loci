@@ -24,6 +24,12 @@ interface UseEpubOptions {
   autoscrollEnabled?: boolean
 }
 
+export interface SearchResult {
+  cfi: string
+  excerpt: string
+  href: string
+}
+
 export interface UseEpubReturn {
   book: Book | null
   rendition: Rendition | null
@@ -46,6 +52,8 @@ export interface UseEpubReturn {
   prevChapter: () => void
   goToHref: (href: string) => void
   getCurrentText: () => string
+  getFullChapterText: () => string
+  searchBook: (query: string) => Promise<SearchResult[]>
   highlightSentence: (text: string) => void
   clearSentenceHighlight: () => void
   setOnTextSelected: (cb: ((quote: string, href: string, pos: { x: number; y: number }) => void) | null) => void
@@ -814,7 +822,7 @@ export function useEpub({ fontSize, theme, layoutMode, highlightEnabled = true, 
             if (!doc) continue
             doc.addEventListener(
               'mouseup',
-              () => {
+              (e) => {
                 const sel = doc.getSelection()
                 const text = sel?.toString().trim() ?? ''
                 if (text.length < 3 || !onTextSelectedRef.current) return
@@ -841,6 +849,7 @@ export function useEpub({ fontSize, theme, layoutMode, highlightEnabled = true, 
               },
               { signal },
             )
+
           }
         } catch {
           // getContents() may throw before the rendition is ready — safe to ignore
@@ -1253,6 +1262,19 @@ export function useEpub({ fontSize, theme, layoutMode, highlightEnabled = true, 
     }
   }, [])
 
+  const getFullChapterText = useCallback((): string => {
+    try {
+      const contents = renditionRef.current?.getContents()
+      if (!contents || contents.length === 0) return ''
+      // getContents() returns an array of Contents objects; use the first one
+      const doc = (contents[0] as any).document as Document | undefined
+      if (!doc) return ''
+      return doc.body?.innerText ?? doc.body?.textContent ?? ''
+    } catch {
+      return ''
+    }
+  }, [])
+
   const clearSentenceHighlight = useCallback(() => {
     const contents = renditionRef.current?.getContents() ?? []
     for (const c of contents) {
@@ -1344,6 +1366,23 @@ export function useEpub({ fontSize, theme, layoutMode, highlightEnabled = true, 
     }
   }, [clearSentenceHighlight, highlightEnabled, autoscrollEnabled])
 
+  const searchBook = useCallback(async (query: string): Promise<SearchResult[]> => {
+    const b = bookRef.current
+    if (!b || !query.trim()) return []
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const raw = await (b as any).search(query.trim())
+      return (raw ?? []).map((r: { cfi: string; excerpt: string }) => {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const spineItem = (b as any).spine?.get(r.cfi)
+        const href: string = spineItem?.href ?? ''
+        return { cfi: r.cfi, excerpt: r.excerpt, href }
+      })
+    } catch {
+      return []
+    }
+  }, [])
+
   const setOnTextSelected = useCallback(
     (cb: ((quote: string, href: string, pos: { x: number; y: number }) => void) | null) => {
       onTextSelectedRef.current = cb
@@ -1405,6 +1444,8 @@ export function useEpub({ fontSize, theme, layoutMode, highlightEnabled = true, 
     prevChapter,
     goToHref,
     getCurrentText,
+    getFullChapterText,
+    searchBook,
     highlightSentence,
     clearSentenceHighlight,
     setOnTextSelected,

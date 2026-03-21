@@ -141,3 +141,7 @@ vite.config.ts.timestamp-*
 # Sample EPUB files (copyrighted study material)
 public/*.epub
 .worktrees/
+
+# Playwright test artifacts
+test-results/
+.playwright-mcp/

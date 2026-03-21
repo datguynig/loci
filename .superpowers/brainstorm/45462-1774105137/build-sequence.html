@@ -1,0 +1,59 @@
+<h2>Build Sequence — What comes first?</h2>
+<p class="subtitle">Three approaches to introducing Clerk + Supabase into Loci. Which order feels right?</p>
+
+<div class="options">
+  <div class="option" data-choice="a" onclick="toggleSelect(this)">
+    <div class="letter">A</div>
+    <div class="content">
+      <h3>Auth-first <span style="font-size:11px;background:#c4a882;color:#fff;padding:2px 6px;border-radius:4px;margin-left:4px;font-weight:500">Recommended</span></h3>
+      <p>Clerk sign-in/sign-out → Supabase schema + RLS → EPUB upload to Storage → Data sync (annotations, prefs)</p>
+      <div class="pros-cons" style="margin-top:10px">
+        <div class="pros"><h4>Why</h4><ul>
+          <li>Books are owned by users — you can't store books without knowing who owns them</li>
+          <li>Clerk is one integration that unlocks everything; do it once, never touch auth again</li>
+          <li>Anonymous users see "Sign in to save your library" — clean progression</li>
+        </ul></div>
+        <div class="cons"><h4>Trade-off</h4><ul>
+          <li>Users can't upload books until auth is live — may feel slow to ship</li>
+        </ul></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="option" data-choice="b" onclick="toggleSelect(this)">
+    <div class="letter">B</div>
+    <div class="content">
+      <h3>Books-first (anonymous)</h3>
+      <p>EPUB upload to Supabase Storage anonymously → add Clerk auth → migrate anonymous books to user account on sign-in</p>
+      <div class="pros-cons" style="margin-top:10px">
+        <div class="pros"><h4>Why</h4><ul>
+          <li>Core feature (book library) ships sooner without auth friction</li>
+          <li>Users can try it before signing up</li>
+        </ul></div>
+        <div class="cons"><h4>Trade-off</h4><ul>
+          <li>Requires migration logic when user later signs in</li>
+          <li>Anonymous storage = no user isolation, harder to secure</li>
+          <li>More complex data model to reconcile anonymous → authenticated state</li>
+        </ul></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="option" data-choice="c" onclick="toggleSelect(this)">
+    <div class="letter">C</div>
+    <div class="content">
+      <h3>Auth + Books together</h3>
+      <p>Build Clerk integration and basic book upload in the same sprint — no reading experience until signed in</p>
+      <div class="pros-cons" style="margin-top:10px">
+        <div class="pros"><h4>Why</h4><ul>
+          <li>No migration complexity — books always owned by a user from day one</li>
+          <li>Simpler data model overall</li>
+        </ul></div>
+        <div class="cons"><h4>Trade-off</h4><ul>
+          <li>Longer until anything ships — auth + books + storage in one go</li>
+          <li>More context to hold at once during implementation</li>
+        </ul></div>
+      </div>
+    </div>
+  </div>
+</div>

@@ -1,0 +1,140 @@
+<h2>Loci — Full System Architecture</h2>
+<p class="subtitle">Clerk handles all identity. Supabase stores everything else. Your frontend talks to both.</p>
+
+<div style="font-family: 'DM Sans', system-ui, sans-serif; margin-top: 24px;">
+
+  <!-- Stack overview -->
+  <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; margin-bottom: 32px;">
+
+    <div style="background: #f0f0ff; border: 1.5px solid #7c7cff; border-radius: 10px; padding: 16px;">
+      <div style="font-size: 11px; font-weight: 600; color: #5555cc; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px">🔐 Clerk</div>
+      <div style="font-size: 13px; color: #222; line-height: 1.6">
+        <strong>Auth & Identity</strong><br>
+        Sign up / Sign in<br>
+        Google OAuth<br>
+        Magic link<br>
+        Session management<br>
+        User profile (name, avatar)<br>
+        Provides: <code style="font-size:11px;background:#e8e8ff;padding:1px 4px;border-radius:3px">userId</code> JWT
+      </div>
+    </div>
+
+    <div style="background: #f0fff4; border: 1.5px solid #3ecf8e; border-radius: 10px; padding: 16px;">
+      <div style="font-size: 11px; font-weight: 600; color: #1a8a5a; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px">🗄️ Supabase</div>
+      <div style="font-size: 13px; color: #222; line-height: 1.6">
+        <strong>Data & Files</strong><br>
+        PostgreSQL database<br>
+        EPUB file storage<br>
+        Cover image CDN<br>
+        Row Level Security<br>
+        <br>
+        Verifies Clerk JWT via<br>
+        JWKS integration
+      </div>
+    </div>
+
+    <div style="background: #fff8f0; border: 1.5px solid #c4a882; border-radius: 10px; padding: 16px;">
+      <div style="font-size: 11px; font-weight: 600; color: #8a6040; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px">⚛️ React App</div>
+      <div style="font-size: 13px; color: #222; line-height: 1.6">
+        <strong>Frontend (Vite)</strong><br>
+        ClerkProvider wraps app<br>
+        useAuth() → Clerk<br>
+        Supabase client w/ Clerk JWT<br>
+        localStorage as cache<br>
+        Existing reader UI
+      </div>
+    </div>
+  </div>
+
+  <!-- Database tables -->
+  <h3 style="margin-bottom: 12px; font-size: 14px; color: #333">Supabase Schema</h3>
+  <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 28px;">
+
+    <div style="background: #fafafa; border: 1px solid #ddd; border-radius: 8px; padding: 14px;">
+      <div style="font-size: 12px; font-weight: 600; color: #3ecf8e; margin-bottom: 8px">📚 books</div>
+      <div style="font-size: 12px; color: #555; font-family: monospace; line-height: 1.8">
+        id: uuid PK<br>
+        user_id: text (Clerk ID)<br>
+        title: text<br>
+        author: text<br>
+        cover_url: text<br>
+        file_path: text  ← Storage<br>
+        file_size: bigint<br>
+        added_at, last_read_at
+      </div>
+    </div>
+
+    <div style="background: #fafafa; border: 1px solid #ddd; border-radius: 8px; padding: 14px;">
+      <div style="font-size: 12px; font-weight: 600; color: #3ecf8e; margin-bottom: 8px">📝 annotations</div>
+      <div style="font-size: 12px; color: #555; font-family: monospace; line-height: 1.8">
+        id: uuid PK<br>
+        user_id: text (Clerk ID)<br>
+        book_id: uuid → books<br>
+        spine_href: text<br>
+        quote: text<br>
+        note: text<br>
+        created_at, updated_at
+      </div>
+    </div>
+
+    <div style="background: #fafafa; border: 1px solid #ddd; border-radius: 8px; padding: 14px;">
+      <div style="font-size: 12px; font-weight: 600; color: #3ecf8e; margin-bottom: 8px">📍 reading_progress</div>
+      <div style="font-size: 12px; color: #555; font-family: monospace; line-height: 1.8">
+        user_id: text  ┐ PK<br>
+        book_id: uuid  ┘<br>
+        spine_href: text<br>
+        scroll_fraction: real<br>
+        tts_sentence_index: int<br>
+        updated_at
+      </div>
+    </div>
+
+    <div style="background: #fafafa; border: 1px solid #ddd; border-radius: 8px; padding: 14px;">
+      <div style="font-size: 12px; font-weight: 600; color: #3ecf8e; margin-bottom: 8px">⚙️ preferences</div>
+      <div style="font-size: 12px; color: #555; font-family: monospace; line-height: 1.8">
+        user_id: text PK<br>
+        theme: text<br>
+        font_size: text<br>
+        layout_mode: text<br>
+        highlight_enabled: bool<br>
+        autoscroll_enabled: bool<br>
+        tts_provider, tts_rate
+      </div>
+    </div>
+  </div>
+
+  <!-- Storage buckets -->
+  <h3 style="margin-bottom: 12px; font-size: 14px; color: #333">Supabase Storage Buckets</h3>
+  <div style="display: flex; gap: 12px; margin-bottom: 28px;">
+    <div style="flex: 1; background: #fafafa; border: 1px solid #ddd; border-radius: 8px; padding: 14px;">
+      <div style="font-size: 12px; font-weight: 600; margin-bottom: 6px">📦 books/ <span style="color:#e55;font-weight:400">(private)</span></div>
+      <div style="font-size: 12px; color: #555">{user_id}/{book_id}.epub<br>Access only via signed URL</div>
+    </div>
+    <div style="flex: 1; background: #fafafa; border: 1px solid #ddd; border-radius: 8px; padding: 14px;">
+      <div style="font-size: 12px; font-weight: 600; margin-bottom: 6px">🖼️ covers/ <span style="color:#3a3;font-weight:400">(public CDN)</span></div>
+      <div style="font-size: 12px; color: #555">{user_id}/{book_id}.jpg<br>Public URL, served via CDN</div>
+    </div>
+  </div>
+
+  <!-- Build phases -->
+  <h3 style="margin-bottom: 12px; font-size: 14px; color: #333">Build Order (Auth-first)</h3>
+  <div style="display: flex; flex-direction: column; gap: 8px;">
+    <div style="display: flex; align-items: center; gap: 12px; background: #f0f0ff; border-radius: 8px; padding: 12px 16px;">
+      <div style="font-size: 18px; min-width: 28px">1</div>
+      <div><strong style="font-size: 13px">Clerk integration</strong> <span style="font-size: 12px; color: #666">— ClerkProvider, sign-in modal, useAuth hook, sign-out</span></div>
+    </div>
+    <div style="display: flex; align-items: center; gap: 12px; background: #f0fff4; border-radius: 8px; padding: 12px 16px;">
+      <div style="font-size: 18px; min-width: 28px">2</div>
+      <div><strong style="font-size: 13px">Supabase + Clerk JWT</strong> <span style="font-size: 12px; color: #666">— Create schema, configure JWKS, RLS policies, Supabase client factory</span></div>
+    </div>
+    <div style="display: flex; align-items: center; gap: 12px; background: #fff8f0; border-radius: 8px; padding: 12px 16px;">
+      <div style="font-size: 18px; min-width: 28px">3</div>
+      <div><strong style="font-size: 13px">Book library</strong> <span style="font-size: 12px; color: #666">— EPUB upload to Storage, books table, library screen replacing current Landing</span></div>
+    </div>
+    <div style="display: flex; align-items: center; gap: 12px; background: #fafafa; border: 1px solid #eee; border-radius: 8px; padding: 12px 16px;">
+      <div style="font-size: 18px; min-width: 28px">4</div>
+      <div><strong style="font-size: 13px">Data sync</strong> <span style="font-size: 12px; color: #666">— Annotations, preferences, reading progress migrated from localStorage to Supabase</span></div>
+    </div>
+  </div>
+
+</div>

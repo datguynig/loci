@@ -3,6 +3,7 @@ import { motion } from 'framer-motion'
 import type { TTSProvider, ElevenLabsModel } from '../services/ttsService'
 import type { ElevenLabsVoice } from '../services/ttsService'
 import { hasElevenLabs } from '../utils/tts'
+import type { FontSize, LayoutMode } from '../hooks/useEpub'
 import VoicePicker from './VoicePicker'
 import ReaderSettings from './ReaderSettings'
 
@@ -34,6 +35,10 @@ interface AudioBarProps {
   onSkipForward: () => void
   onSkipBack: () => void
   // Settings
+  fontSize: FontSize
+  onFontSizeChange: (s: FontSize) => void
+  layoutMode: LayoutMode
+  onLayoutModeChange: (m: LayoutMode) => void
   highlightEnabled: boolean
   onHighlightChange: (v: boolean) => void
   autoscrollEnabled: boolean
@@ -152,6 +157,10 @@ export default function AudioBar({
   onStop,
   onSkipForward,
   onSkipBack,
+  fontSize,
+  onFontSizeChange,
+  layoutMode,
+  onLayoutModeChange,
   highlightEnabled,
   onHighlightChange,
   autoscrollEnabled,
@@ -264,6 +273,10 @@ export default function AudioBar({
           <ReaderSettings
             isOpen={settingsOpen}
             onClose={onSettingsToggle}
+            fontSize={fontSize}
+            onFontSizeChange={onFontSizeChange}
+            layoutMode={layoutMode}
+            onLayoutModeChange={onLayoutModeChange}
             highlightEnabled={highlightEnabled}
             onHighlightChange={onHighlightChange}
             autoscrollEnabled={autoscrollEnabled}

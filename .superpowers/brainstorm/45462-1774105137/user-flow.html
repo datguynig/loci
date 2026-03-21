@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Loci — User Flow</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500&family=DM+Sans:wght@300;400;500;600&display=swap');
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: #F8F7F4; font-family: 'DM Sans', system-ui; padding: 48px; color: #1a1a1a; }
+
+  h1 { font-family: 'Playfair Display', serif; font-size: 26px; font-weight: 400; color: #1a1a1a; margin-bottom: 8px; }
+  .sub { font-size: 14px; color: #6B6560; margin-bottom: 48px; }
+
+  /* ── FLOW ── */
+  .flow { display: flex; flex-direction: column; gap: 0; max-width: 760px; margin: 0 auto; }
+
+  .step {
+    display: flex; align-items: flex-start; gap: 24px;
+    position: relative;
+  }
+  .step-left { display: flex; flex-direction: column; align-items: center; }
+  .step-dot {
+    width: 36px; height: 36px; border-radius: 50%; flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 13px; font-weight: 600; z-index: 1;
+  }
+  .step-line {
+    width: 2px; background: rgba(0,0,0,0.08); flex: 1; min-height: 40px;
+  }
+  .step-body { padding-bottom: 40px; flex: 1; padding-top: 4px; }
+  .step-title { font-size: 15px; font-weight: 600; color: #1a1a1a; margin-bottom: 5px; }
+  .step-desc { font-size: 13px; color: #6B6560; line-height: 1.65; }
+
+  .dot-auth { background: #1a1a1a; color: #fff; }
+  .dot-upload { background: #c4a882; color: #fff; }
+  .dot-read { background: #c4a882; color: #fff; }
+  .dot-save { background: #EFEDE8; color: #1a1a1a; border: 1.5px solid rgba(0,0,0,0.12); }
+  .dot-library { background: #1a1a1a; color: #fff; }
+  .dot-notes { background: #EFEDE8; color: #1a1a1a; border: 1.5px solid rgba(0,0,0,0.12); }
+
+  /* ── BRANCH ── */
+  .branch-block {
+    margin: -8px 0 0 60px; padding: 16px 20px;
+    background: #fff; border: 1px solid rgba(0,0,0,0.07);
+    border-radius: 10px; margin-bottom: 40px;
+  }
+  .branch-title { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; color: #B0ACA6; margin-bottom: 12px; }
+  .branch-options { display: flex; flex-direction: column; gap: 10px; }
+  .branch-item { display: flex; align-items: flex-start; gap: 12px; }
+  .branch-dot { width: 20px; height: 20px; border-radius: 50%; background: rgba(196,168,130,0.15); border: 1.5px solid #c4a882; display: flex; align-items: center; justify-content: center; flex-shrink: 0; margin-top: 1px; }
+  .branch-dot-inner { width: 6px; height: 6px; border-radius: 50%; background: #c4a882; }
+  .branch-label { font-size: 13px; font-weight: 500; color: #1a1a1a; }
+  .branch-sub { font-size: 12px; color: #6B6560; }
+
+  /* ── NOTES SECTION ── */
+  .notes-question {
+    max-width: 760px; margin: 0 auto; padding: 28px;
+    background: #fff; border: 1px solid rgba(196,168,130,0.3);
+    border-left: 3px solid #c4a882; border-radius: 10px;
+  }
+  .notes-q-label { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; color: #c4a882; margin-bottom: 12px; }
+  .notes-q-title { font-size: 15px; font-weight: 600; color: #1a1a1a; margin-bottom: 8px; }
+  .notes-q-body { font-size: 13px; color: #6B6560; line-height: 1.65; margin-bottom: 16px; }
+  .notes-options { display: flex; gap: 12px; flex-wrap: wrap; }
+  .notes-opt {
+    padding: 8px 16px; border-radius: 8px; font-size: 13px; font-weight: 500;
+    border: 1.5px solid rgba(0,0,0,0.1); color: #1a1a1a; background: #F8F7F4;
+  }
+</style>
+</head>
+<body>
+
+<h1>Loci — Core User Flow</h1>
+<p class="sub">From sign-up to reading in as few steps as possible. Agreed architecture: Clerk + Supabase.</p>
+
+<div class="flow">
+
+  <!-- 1. Auth -->
+  <div class="step">
+    <div class="step-left">
+      <div class="step-dot dot-auth">1</div>
+      <div class="step-line"></div>
+    </div>
+    <div class="step-body">
+      <div class="step-title">Sign up / Sign in</div>
+      <div class="step-desc">Clerk modal appears on first visit. Email + password, or Google OAuth. On return visit, Clerk restores the session silently — no modal unless explicitly signed out. First-time users land on the empty library immediately after confirming email.</div>
+    </div>
+  </div>
+
+  <!-- 2. Upload -->
+  <div class="step">
+    <div class="step-left">
+      <div class="step-dot dot-upload">2</div>
+      <div class="step-line"></div>
+    </div>
+    <div class="step-body">
+      <div class="step-title">Upload first EPUB</div>
+      <div class="step-desc">Empty library shows a centred upload prompt — drag and drop or click to browse. File uploads to Supabase Storage. Cover extracted from the EPUB automatically. On success, the book opens directly in the reader. No intermediate confirmation screen.</div>
+    </div>
+  </div>
+
+  <!-- 3. Read / Listen -->
+  <div class="step">
+    <div class="step-left">
+      <div class="step-dot dot-read">3</div>
+      <div class="step-line"></div>
+    </div>
+    <div class="step-body">
+      <div class="step-title">Read or listen</div>
+      <div class="step-desc">Reader opens at the first chapter. User can read at their own pace, or hit Play to let TTS read aloud with sentence highlighting and autoscroll. All existing controls (font size, layout, theme, voice, speed) are immediately available.</div>
+    </div>
+  </div>
+
+  <!-- 4. In-session actions (branch) -->
+  <div class="step">
+    <div class="step-left">
+      <div class="step-dot dot-save">↓</div>
+      <div class="step-line"></div>
+    </div>
+    <div class="step-body">
+      <div class="step-title" style="color:#6B6560">While reading — available actions</div>
+      <div class="step-desc" style="margin-bottom:0">User can do any of these at any time:</div>
+    </div>
+  </div>
+
+</div>
+
+<div class="branch-block">
+  <div class="branch-title">Actions available in reader</div>
+  <div class="branch-options">
+    <div class="branch-item">
+      <div class="branch-dot"><div class="branch-dot-inner"></div></div>
+      <div>
+        <div class="branch-label">Progress autosaves</div>
+        <div class="branch-sub">Chapter, scroll position, and TTS sentence index saved to Supabase every 30s and on chapter change. No user action needed.</div>
+      </div>
+    </div>
+    <div class="branch-item">
+      <div class="branch-dot"><div class="branch-dot-inner"></div></div>
+      <div>
+        <div class="branch-label">Bookmark</div>
+        <div class="branch-sub">One tap to drop a pin at the current position. Appears in the sidebar. Tap to jump back to it on any device.</div>
+      </div>
+    </div>
+    <div class="branch-item">
+      <div class="branch-dot"><div class="branch-dot-inner"></div></div>
+      <div>
+        <div class="branch-label">Add a note</div>
+        <div class="branch-sub">Select any text → "+ Note" bubble → write note → saved to Supabase. Annotated passage gets warm underline in the text.</div>
+      </div>
+    </div>
+    <div class="branch-item">
+      <div class="branch-dot"><div class="branch-dot-inner"></div></div>
+      <div>
+        <div class="branch-label">Search within book</div>
+        <div class="branch-sub">Ctrl+F opens search bar. Jump to any match in the spine.</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="flow">
+
+  <!-- 5. Close → Library -->
+  <div class="step">
+    <div class="step-left">
+      <div class="step-dot dot-library">5</div>
+      <div class="step-line"></div>
+    </div>
+    <div class="step-body">
+      <div class="step-title">Close book → Library</div>
+      <div class="step-desc">Header back-arrow (or keyboard shortcut) returns to the library. Library shows all books with cover, progress %, and last-read date. Clicking any book resumes from the saved position automatically.</div>
+    </div>
+  </div>
+
+  <!-- 6. Notes view -->
+  <div class="step">
+    <div class="step-left">
+      <div class="step-dot dot-notes">6</div>
+      <div class="step-line" style="min-height:0;flex:0"></div>
+    </div>
+    <div class="step-body" style="padding-bottom:40px">
+      <div class="step-title" style="color:#6B6560">Notes — where do they live?</div>
+      <div class="step-desc">Notes already exist in the reader sidebar. The question is whether to surface them at the library level too.</div>
+    </div>
+  </div>
+
+</div>
+
+<!-- Notes question -->
+<div class="notes-question">
+  <div class="notes-q-label">Open question</div>
+  <div class="notes-q-title">Do you need a notes view outside the reader?</div>
+  <div class="notes-q-body">
+    The reader sidebar already shows notes per-chapter. Two additional surfaces are possible — pick what's useful to you:<br><br>
+    <strong>Per-book notes page:</strong> accessible from the library card. Shows all notes for that book as a clean reading list — quote in serif, your note beneath it, chapter label. Good for review before a meeting or exporting.<br><br>
+    <strong>Global notes view:</strong> a "Notes" tab in the library. All annotations across your entire library, grouped by book, searchable. More like a Kindle highlights dashboard.
+  </div>
+  <div class="notes-options">
+    <div class="notes-opt">Per-book only</div>
+    <div class="notes-opt">Global notes tab</div>
+    <div class="notes-opt">Both</div>
+    <div class="notes-opt">Neither — sidebar is enough</div>
+  </div>
+</div>
+
+</body>
+</html>

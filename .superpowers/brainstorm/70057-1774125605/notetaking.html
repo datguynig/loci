@@ -1,0 +1,85 @@
+<h2>Note-taking approaches</h2>
+<p class="subtitle">Which feels right for how students actually study?</p>
+
+<div class="cards">
+
+  <div class="card" data-choice="a" onclick="toggleSelect(this)">
+    <div class="card-image" style="background:#F8F7F4;padding:16px;font-family:system-ui">
+      <!-- Mini reader mockup -->
+      <div style="background:#fff;border-radius:8px;border:1px solid #e5e1da;overflow:hidden">
+        <div style="background:#F0EDE8;padding:8px 12px;font-size:11px;color:#6B6560;display:flex;justify-content:space-between;align-items:center">
+          <span style="font-weight:600">Chapter 3</span>
+          <button style="background:#C4A882;color:#fff;border:none;border-radius:5px;padding:3px 8px;font-size:10px;cursor:pointer">+ Note</button>
+        </div>
+        <div style="padding:12px;font-size:10px;color:#3a3733;line-height:1.5">
+          <p style="margin:0 0 6px">The mitochondria is the powerhouse of the cell. Energy production occurs through a complex chain of reactions...</p>
+          <div style="background:#FAFAF8;border:1px solid #E8E5E0;border-radius:6px;padding:8px;margin-top:8px">
+            <div style="font-size:9px;color:#B0ACA6;margin-bottom:4px">Chapter note</div>
+            <div style="font-size:10px;color:#6B6560">This connects to what we saw in Ch.1 about ATP synthesis...</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>A — Chapter notes</h3>
+      <p>"+ Note" button in the header. Opens a blank editor tied to the current chapter. No highlight needed. Notes appear in the sidebar under that chapter.</p>
+    </div>
+  </div>
+
+  <div class="card" data-choice="b" onclick="toggleSelect(this)">
+    <div class="card-image" style="background:#F8F7F4;padding:16px;font-family:system-ui">
+      <div style="display:flex;gap:8px;height:120px">
+        <!-- Reader side -->
+        <div style="flex:1;background:#fff;border-radius:8px;border:1px solid #e5e1da;padding:10px;font-size:10px;color:#3a3733;line-height:1.5;overflow:hidden">
+          <div style="font-weight:600;font-size:9px;color:#6B6560;margin-bottom:6px">CHAPTER 3</div>
+          <p style="margin:0">The mitochondria is the powerhouse of the cell...</p>
+        </div>
+        <!-- Scratchpad side -->
+        <div style="width:100px;background:#FEFDF9;border-radius:8px;border:1px solid #E8E5E0;padding:8px;font-size:9px;color:#6B6560">
+          <div style="font-weight:600;color:#B0ACA6;margin-bottom:4px;font-size:8px;letter-spacing:0.05em;text-transform:uppercase">Scratchpad</div>
+          <div style="color:#3a3733;line-height:1.4">Mitochondria = energy<br/><br/>Connects to ATP from Ch1<br/><br/>Key exam point ⭐</div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>B — Book scratchpad</h3>
+      <p>A persistent free-form panel alongside the reader. Like a notepad next to a textbook. No chapter context — one big space for the whole book.</p>
+    </div>
+  </div>
+
+  <div class="card" data-choice="c" onclick="toggleSelect(this)">
+    <div class="card-image" style="background:#F8F7F4;padding:16px;font-family:system-ui">
+      <div style="background:#fff;border-radius:8px;border:1px solid #e5e1da;overflow:hidden">
+        <div style="background:#F0EDE8;padding:8px 12px;font-size:11px;color:#6B6560;display:flex;justify-content:space-between;align-items:center">
+          <span style="font-weight:600">Chapter 3</span>
+          <div style="display:flex;gap:6px">
+            <button style="background:transparent;border:1px solid #C4A882;color:#C4A882;border-radius:5px;padding:3px 8px;font-size:10px">+ Note</button>
+            <button style="background:#C4A882;color:#fff;border:none;border-radius:5px;padding:3px 8px;font-size:10px">Scratchpad</button>
+          </div>
+        </div>
+        <div style="padding:10px;font-size:10px;color:#3a3733;line-height:1.5">
+          <p style="margin:0 0 6px">The mitochondria is the powerhouse of the cell...</p>
+          <div style="display:flex;gap:6px;margin-top:6px">
+            <div style="flex:1;background:#FAFAF8;border-radius:5px;padding:6px;font-size:9px;color:#6B6560;border:1px solid #e5e1da">
+              <div style="color:#B0ACA6;font-size:8px;margin-bottom:2px">Ch.3 note</div>
+              This connects to ATP synthesis...
+            </div>
+            <div style="flex:1;background:#FEFDF9;border-radius:5px;padding:6px;font-size:9px;color:#6B6560;border:1px solid #e5e1da">
+              <div style="color:#B0ACA6;font-size:8px;margin-bottom:2px">Scratchpad</div>
+              Key exam point ⭐ Todo: reread Ch1
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>C — Both (recommended)</h3>
+      <p>Chapter notes for in-context thoughts. Scratchpad for synthesis, todos, and exam prep across the whole book. AI can draw from both.</p>
+    </div>
+  </div>
+
+</div>
+
+<div class="section" style="margin-top:16px;background:#F0EDE8;border-radius:8px;padding:12px 16px">
+  <p style="margin:0;font-size:13px;color:#6B6560"><strong style="color:#3a3733">My recommendation: C.</strong> A chapter note is the natural replacement for "highlight-required" — same context, no friction. The scratchpad is where studying actually happens: connecting ideas, writing exam summaries, tracking questions. AI works best when it has both: it can pull from chapter notes for specifics and from the scratchpad for the student's big-picture thinking.</p>
+</div>

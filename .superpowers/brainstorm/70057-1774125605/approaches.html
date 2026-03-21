@@ -1,0 +1,46 @@
+<h2>Three architectural directions</h2>
+<p class="subtitle">How the AI study system is structured — each has a different feel</p>
+
+<div class="options">
+
+  <div class="option" data-choice="a" onclick="toggleSelect(this)">
+    <div class="letter">A</div>
+    <div class="content">
+      <h3>Tabbed study panel</h3>
+      <p>The right panel has explicit tabs: <strong>Chat · Summary · Flashcards · Notes</strong>. Each tab has its own dedicated UI — summary shows a generated digest, flashcards shows a card stack, notes shows the scratchpad. AI is a feature set, clearly organised.</p>
+      <div class="pros-cons" style="margin-top:8px">
+        <div class="pros"><h4>Pros</h4><ul><li>Predictable, easy to learn</li><li>Each mode has purpose-built UI</li></ul></div>
+        <div class="cons"><h4>Cons</h4><ul><li>Feels like a feature list, not a product</li><li>Context switching between tabs breaks flow</li><li>Most apps look like this</li></ul></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="option" data-choice="b" onclick="toggleSelect(this)">
+    <div class="letter">B</div>
+    <div class="content">
+      <h3>Chat-first with smart chips ✦ <span style="color:#C4A882;font-size:12px">Recommended</span></h3>
+      <p>The panel is a single, beautiful chat thread. Above the input, <strong>context-aware chips</strong> appear based on what you're doing: reading → "Summarise chapter". Notes open → "Review my notes". Flashcards are generated inline as cards within the chat thread and auto-saved. No tabs — the AI knows where you are.</p>
+      <div class="pros-cons" style="margin-top:8px">
+        <div class="pros"><h4>Pros</h4><ul><li>Feels like a personal tutor, not a tool</li><li>One surface — no context switching</li><li>Chips make capabilities discoverable</li><li>Flashcards/summaries live in chat history</li><li>Visually distinctive — no app looks like this</li></ul></div>
+        <div class="cons"><h4>Cons</h4><ul><li>Harder to build the chip logic</li><li>Flashcard review UI needs to be elegant within chat</li></ul></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="option" data-choice="c" onclick="toggleSelect(this)">
+    <div class="letter">C</div>
+    <div class="content">
+      <h3>Ambient AI (woven throughout)</h3>
+      <p>No dedicated AI panel. Instead, AI is embedded everywhere: hover a highlight → "Explain", chapter header → "Summarise", selection bubble → "Add to flashcards", scratchpad → "Help me revise this". The AI is invisible infrastructure, not a destination.</p>
+      <div class="pros-cons" style="margin-top:8px">
+        <div class="pros"><h4>Pros</h4><ul><li>Most "magical" feeling</li><li>Zero UI overhead</li><li>AI feels native, not bolted on</li></ul></div>
+        <div class="cons"><h4>Cons</h4><ul><li>No place for open-ended Q&A</li><li>No persistent conversation</li><li>Hard to discover all capabilities</li><li>Very complex to implement well</li></ul></div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<div class="section" style="margin-top:20px;background:#1A1917;border-radius:10px;padding:16px 20px">
+  <p style="margin:0;font-size:13px;color:#F0EDE8;line-height:1.6"><strong style="color:#C4A882">Why B wins for an award-winning product:</strong> Tabs (A) look like every edtech tool built in 2019. Ambient-only (C) sacrifices the persistent conversation that makes AI feel like a tutor. B gives you a single, gorgeous chat surface that <em>feels</em> intelligent — it knows you're on Chapter 3, surfaces the right chip, generates a flashcard deck that drops into the thread as a beautiful card stack. The whole thing reads as one coherent experience, not a feature grid.</p>
+</div>

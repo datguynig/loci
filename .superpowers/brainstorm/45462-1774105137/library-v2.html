@@ -1,0 +1,368 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Loci — Library Design</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500&family=DM+Sans:wght@300;400;500;600&display=swap');
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: #0e0e0d; color: #f0ede8; font-family: 'DM Sans', system-ui, sans-serif; }
+
+  /* ─── NAV ─────────────────────────────────── */
+  .nav {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 0 48px; height: 60px;
+    border-bottom: 1px solid rgba(255,255,255,0.06);
+    position: sticky; top: 0; z-index: 10;
+    background: rgba(14,14,13,0.85); backdrop-filter: blur(20px);
+  }
+  .wordmark { font-family: 'Playfair Display', serif; font-size: 20px; font-weight: 400; letter-spacing: -0.3px; color: #f0ede8; }
+  .nav-right { display: flex; align-items: center; gap: 16px; }
+  .avatar { width: 32px; height: 32px; border-radius: 50%; background: #c4a882; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 600; color: #fff; cursor: pointer; }
+  .add-btn {
+    display: flex; align-items: center; gap: 6px;
+    background: #f0ede8; color: #0e0e0d;
+    border: none; border-radius: 8px; padding: 7px 16px;
+    font-family: 'DM Sans', system-ui; font-size: 13px; font-weight: 500;
+    cursor: pointer; transition: opacity 100ms;
+  }
+  .add-btn:hover { opacity: 0.88; }
+
+  /* ─── TABS ─────────────────────────────────── */
+  .tabs {
+    display: flex; gap: 0; padding: 0 48px;
+    border-bottom: 1px solid rgba(255,255,255,0.06);
+  }
+  .tab {
+    padding: 14px 0; margin-right: 28px;
+    font-size: 13px; font-weight: 500; color: rgba(240,237,232,0.4);
+    border-bottom: 2px solid transparent; cursor: pointer;
+    transition: color 120ms, border-color 120ms;
+  }
+  .tab.active { color: #f0ede8; border-bottom-color: #c4a882; }
+
+  /* ─── MAIN CONTENT ─────────────────────────── */
+  .content { padding: 40px 48px 80px; }
+
+  /* ─── CONTINUE READING ─────────────────────── */
+  .section-label {
+    font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 1px;
+    color: rgba(240,237,232,0.35); margin-bottom: 20px;
+  }
+
+  .continue-card {
+    display: flex; align-items: center; gap: 24px;
+    background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 14px; padding: 20px 24px; margin-bottom: 48px;
+    cursor: pointer; transition: background 150ms;
+  }
+  .continue-card:hover { background: rgba(255,255,255,0.07); }
+  .continue-cover {
+    width: 52px; height: 78px; border-radius: 5px; flex-shrink: 0;
+    background: linear-gradient(135deg, #8b7355, #c4a882);
+    box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+  }
+  .continue-info { flex: 1; }
+  .continue-title { font-size: 15px; font-weight: 500; color: #f0ede8; margin-bottom: 4px; }
+  .continue-author { font-size: 12px; color: rgba(240,237,232,0.45); margin-bottom: 12px; }
+  .progress-track { background: rgba(255,255,255,0.1); border-radius: 99px; height: 3px; width: 240px; }
+  .progress-fill { background: #c4a882; height: 100%; border-radius: 99px; width: 67%; }
+  .continue-meta { font-size: 11px; color: rgba(240,237,232,0.3); margin-top: 6px; }
+  .continue-cta {
+    font-size: 13px; font-weight: 500; color: #c4a882;
+    background: rgba(196,168,130,0.12); border: 1px solid rgba(196,168,130,0.2);
+    border-radius: 8px; padding: 8px 18px; white-space: nowrap; flex-shrink: 0;
+  }
+
+  /* ─── BOOK GRID ────────────────────────────── */
+  .grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 28px 20px; }
+
+  .book-card { cursor: pointer; }
+  .book-cover-wrap { position: relative; margin-bottom: 12px; }
+  .book-cover {
+    width: 100%; aspect-ratio: 2/3; border-radius: 8px;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+    transition: transform 200ms ease, box-shadow 200ms ease;
+    overflow: hidden; position: relative;
+  }
+  .book-card:hover .book-cover {
+    transform: translateY(-4px) scale(1.02);
+    box-shadow: 0 16px 48px rgba(0,0,0,0.65);
+  }
+  .book-cover-overlay {
+    position: absolute; inset: 0;
+    background: linear-gradient(to top, rgba(0,0,0,0.7) 0%, transparent 50%);
+    opacity: 0; transition: opacity 200ms;
+    display: flex; align-items: flex-end; padding: 12px;
+    border-radius: 8px;
+  }
+  .book-card:hover .book-cover-overlay { opacity: 1; }
+  .open-label { font-size: 11px; font-weight: 600; color: #fff; letter-spacing: 0.5px; text-transform: uppercase; }
+
+  .progress-strip {
+    position: absolute; bottom: 0; left: 0; right: 0; height: 3px;
+    background: rgba(255,255,255,0.12);
+  }
+  .progress-strip-fill { height: 100%; background: #c4a882; }
+
+  .book-title { font-size: 12px; font-weight: 500; color: #f0ede8; line-height: 1.4; margin-bottom: 3px; }
+  .book-author { font-size: 11px; color: rgba(240,237,232,0.35); }
+
+  /* ─── COVER COLORS ─────────────────────────── */
+  .c1 { background: linear-gradient(160deg, #6b4c3b 0%, #c4a882 100%); }
+  .c2 { background: linear-gradient(160deg, #2d4a5e 0%, #6fa8c8 100%); }
+  .c3 { background: linear-gradient(160deg, #3e2d5c 0%, #9b72b8 100%); }
+  .c4 { background: linear-gradient(160deg, #2a4a2e 0%, #6aab74 100%); }
+  .c5 { background: linear-gradient(160deg, #5c2d2d 0%, #c47272 100%); }
+
+  /* ─── SECTION TABS (screen selector) ──────── */
+  .screen-selector {
+    position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
+    display: flex; gap: 8px; background: rgba(30,30,28,0.9);
+    backdrop-filter: blur(20px); border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 99px; padding: 6px 8px; z-index: 100;
+  }
+  .screen-btn {
+    font-family: 'DM Sans', system-ui; font-size: 12px; font-weight: 500;
+    padding: 6px 16px; border-radius: 99px; border: none; cursor: pointer;
+    transition: background 120ms, color 120ms;
+    background: transparent; color: rgba(240,237,232,0.5);
+  }
+  .screen-btn.active { background: #f0ede8; color: #0e0e0d; }
+
+  /* ─── SCREENS ──────────────────────────────── */
+  .screen { display: none; }
+  .screen.visible { display: block; }
+
+  /* ─── LANDING (signed out) ─────────────────── */
+  .landing-hero {
+    min-height: calc(100vh - 60px);
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    text-align: center; padding: 80px 48px;
+  }
+  .landing-eyebrow {
+    font-size: 11px; font-weight: 600; text-transform: uppercase;
+    letter-spacing: 2px; color: #c4a882; margin-bottom: 24px;
+  }
+  .landing-headline {
+    font-family: 'Playfair Display', serif;
+    font-size: clamp(40px, 5vw, 64px); font-weight: 400;
+    color: #f0ede8; line-height: 1.15; max-width: 600px;
+    margin-bottom: 20px; letter-spacing: -0.5px;
+  }
+  .landing-sub {
+    font-size: 16px; color: rgba(240,237,232,0.45); max-width: 400px;
+    line-height: 1.65; margin-bottom: 40px;
+  }
+  .landing-cta {
+    background: #f0ede8; color: #0e0e0d;
+    border: none; border-radius: 10px; padding: 14px 36px;
+    font-family: 'DM Sans', system-ui; font-size: 15px; font-weight: 500;
+    cursor: pointer; transition: opacity 120ms; margin-bottom: 14px;
+  }
+  .landing-cta:hover { opacity: 0.88; }
+  .landing-hint { font-size: 12px; color: rgba(240,237,232,0.25); }
+
+  /* ─── EMPTY STATE ──────────────────────────── */
+  .empty-state {
+    min-height: calc(100vh - 120px);
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    text-align: center; padding: 80px 48px;
+  }
+  .empty-icon {
+    width: 72px; height: 72px; border-radius: 18px;
+    background: rgba(196,168,130,0.12);
+    border: 1px solid rgba(196,168,130,0.2);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 30px; margin: 0 auto 28px;
+  }
+  .empty-title {
+    font-family: 'Playfair Display', serif;
+    font-size: 28px; font-weight: 400; color: #f0ede8;
+    margin-bottom: 12px; letter-spacing: -0.3px;
+  }
+  .empty-sub {
+    font-size: 14px; color: rgba(240,237,232,0.4);
+    max-width: 320px; line-height: 1.65; margin-bottom: 36px;
+  }
+  .empty-drop {
+    width: 340px; border: 1.5px dashed rgba(196,168,130,0.35);
+    border-radius: 16px; padding: 40px 32px;
+    color: rgba(240,237,232,0.35); font-size: 13px;
+    transition: border-color 200ms, background 200ms;
+    cursor: pointer;
+  }
+  .empty-drop:hover {
+    border-color: rgba(196,168,130,0.7);
+    background: rgba(196,168,130,0.05);
+    color: rgba(240,237,232,0.6);
+  }
+  .empty-drop-icon { font-size: 28px; margin-bottom: 12px; }
+  .empty-drop-label { font-size: 14px; font-weight: 500; color: #c4a882; margin-bottom: 6px; }
+</style>
+</head>
+<body>
+
+<!-- ── SCREEN SELECTOR (meta UI) ─────────────── -->
+<div class="screen-selector">
+  <button class="screen-btn active" onclick="showScreen('landing')">① Landing</button>
+  <button class="screen-btn" onclick="showScreen('empty')">② First visit</button>
+  <button class="screen-btn" onclick="showScreen('library')">③ Library</button>
+</div>
+
+<!-- ══════════════════════════════════════════════
+     SCREEN 1 — LANDING (not signed in)
+══════════════════════════════════════════════ -->
+<div class="screen visible" id="screen-landing">
+  <nav class="nav">
+    <span class="wordmark">Loci</span>
+    <div class="nav-right">
+      <button class="add-btn">Sign in</button>
+    </div>
+  </nav>
+
+  <div class="landing-hero">
+    <div class="landing-eyebrow">Read more. Remember more.</div>
+    <h1 class="landing-headline">Your books, everywhere you read.</h1>
+    <p class="landing-sub">Upload your EPUB library once. Read, listen, and annotate from any device — all in one place.</p>
+    <button class="landing-cta">Get started free</button>
+    <span class="landing-hint">No credit card required · Your files stay private</span>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════
+     SCREEN 2 — FIRST VISIT (signed in, no books)
+══════════════════════════════════════════════ -->
+<div class="screen" id="screen-empty">
+  <nav class="nav">
+    <span class="wordmark">Loci</span>
+    <div class="nav-right">
+      <div class="avatar">N</div>
+    </div>
+  </nav>
+
+  <div class="empty-state">
+    <div class="empty-icon">📚</div>
+    <h2 class="empty-title">Your library is empty</h2>
+    <p class="empty-sub">Add your first book to get started. Your EPUBs are stored privately and sync across all your devices.</p>
+    <div class="empty-drop">
+      <div class="empty-drop-icon">↑</div>
+      <div class="empty-drop-label">Drop an EPUB here</div>
+      <div>or click to browse</div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════
+     SCREEN 3 — LIBRARY (with books)
+══════════════════════════════════════════════ -->
+<div class="screen" id="screen-library">
+  <nav class="nav">
+    <span class="wordmark">Loci</span>
+    <div class="nav-right">
+      <button class="add-btn">
+        <span style="font-size:16px;line-height:1;margin-top:-1px">+</span>
+        Add book
+      </button>
+      <div class="avatar">N</div>
+    </div>
+  </nav>
+
+  <div class="tabs">
+    <div class="tab active">All books</div>
+    <div class="tab">Recently read</div>
+    <div class="tab">Finished</div>
+  </div>
+
+  <div class="content">
+    <!-- Continue reading banner -->
+    <div class="section-label">Continue reading</div>
+    <div class="continue-card">
+      <div class="continue-cover c1"></div>
+      <div class="continue-info">
+        <div class="continue-title">The Design of Everyday Things</div>
+        <div class="continue-author">Don Norman</div>
+        <div class="progress-track"><div class="progress-fill"></div></div>
+        <div class="continue-meta">67% complete · Chapter 4 of 9 · Last read 2 hours ago</div>
+      </div>
+      <div class="continue-cta">Continue →</div>
+    </div>
+
+    <!-- Book grid -->
+    <div class="section-label">Your library</div>
+    <div class="grid">
+
+      <div class="book-card">
+        <div class="book-cover-wrap">
+          <div class="book-cover c1">
+            <div class="book-cover-overlay"><span class="open-label">Open</span></div>
+            <div class="progress-strip"><div class="progress-strip-fill" style="width:67%"></div></div>
+          </div>
+        </div>
+        <div class="book-title">The Design of Everyday Things</div>
+        <div class="book-author">Don Norman</div>
+      </div>
+
+      <div class="book-card">
+        <div class="book-cover-wrap">
+          <div class="book-cover c2">
+            <div class="book-cover-overlay"><span class="open-label">Open</span></div>
+            <div class="progress-strip"><div class="progress-strip-fill" style="width:12%"></div></div>
+          </div>
+        </div>
+        <div class="book-title">Moby Dick</div>
+        <div class="book-author">Herman Melville</div>
+      </div>
+
+      <div class="book-card">
+        <div class="book-cover-wrap">
+          <div class="book-cover c3">
+            <div class="book-cover-overlay"><span class="open-label">Open</span></div>
+            <div class="progress-strip"><div class="progress-strip-fill" style="width:34%"></div></div>
+          </div>
+        </div>
+        <div class="book-title">Thinking, Fast and Slow</div>
+        <div class="book-author">Daniel Kahneman</div>
+      </div>
+
+      <div class="book-card">
+        <div class="book-cover-wrap">
+          <div class="book-cover c4">
+            <div class="book-cover-overlay"><span class="open-label">Open</span></div>
+            <div class="progress-strip"><div class="progress-strip-fill" style="width:100%"></div></div>
+          </div>
+        </div>
+        <div class="book-title">The Lean Startup</div>
+        <div class="book-author">Eric Ries</div>
+      </div>
+
+      <div class="book-card">
+        <div class="book-cover-wrap">
+          <div class="book-cover c5">
+            <div class="book-cover-overlay"><span class="open-label">Open</span></div>
+            <div class="progress-strip"><div class="progress-strip-fill" style="width:5%"></div></div>
+          </div>
+        </div>
+        <div class="book-title">Deep Work</div>
+        <div class="book-author">Cal Newport</div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<script>
+function showScreen(name) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('visible'));
+  document.querySelectorAll('.screen-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('screen-' + name).classList.add('visible');
+  event.target.classList.add('active');
+  window.scrollTo(0, 0);
+}
+</script>
+</body>
+</html>

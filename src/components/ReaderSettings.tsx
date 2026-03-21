@@ -1,9 +1,17 @@
 import { useEffect, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
+import type { FontSize, LayoutMode } from '../hooks/useEpub'
+
+const FONT_SIZE_ORDER: FontSize[] = ['sm', 'md', 'lg', 'xl']
+const FONT_SIZE_LABELS: Record<FontSize, string> = { sm: 'S', md: 'M', lg: 'L', xl: 'XL' }
 
 interface ReaderSettingsProps {
   isOpen: boolean
   onClose: () => void
+  fontSize: FontSize
+  onFontSizeChange: (s: FontSize) => void
+  layoutMode: LayoutMode
+  onLayoutModeChange: (m: LayoutMode) => void
   highlightEnabled: boolean
   onHighlightChange: (v: boolean) => void
   autoscrollEnabled: boolean
@@ -79,6 +87,10 @@ function Toggle({
 export default function ReaderSettings({
   isOpen,
   onClose,
+  fontSize,
+  onFontSizeChange,
+  layoutMode,
+  onLayoutModeChange,
   highlightEnabled,
   onHighlightChange,
   autoscrollEnabled,
@@ -114,6 +126,7 @@ export default function ReaderSettings({
     return () => document.removeEventListener('keydown', handler)
   }, [isOpen, onClose])
 
+
   return (
     <AnimatePresence>
       {isOpen && (
@@ -138,6 +151,123 @@ export default function ReaderSettings({
             overflow: 'hidden',
           }}
         >
+          {/* Display section */}
+          <div
+            style={{
+              padding: '8px 14px 6px',
+              borderBottom: '1px solid var(--border)',
+              fontFamily: 'var(--font-ui)',
+              fontSize: 11,
+              fontWeight: 600,
+              letterSpacing: '0.06em',
+              textTransform: 'uppercase',
+              color: 'var(--text-tertiary)',
+            }}
+          >
+            Display
+          </div>
+
+          {/* Font size */}
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              padding: '8px 14px',
+              gap: 16,
+            }}
+          >
+            <span
+              style={{
+                fontFamily: 'var(--font-ui)',
+                fontSize: 12,
+                color: 'var(--text-primary)',
+                userSelect: 'none',
+              }}
+            >
+              Font size
+            </span>
+            <div style={{ display: 'flex', gap: 2 }}>
+              {FONT_SIZE_ORDER.map((s) => (
+                <button
+                  key={s}
+                  onClick={() => onFontSizeChange(s)}
+                  aria-label={`Font size ${s}`}
+                  aria-pressed={fontSize === s}
+                  style={{
+                    width: 28,
+                    height: 26,
+                    border: 'none',
+                    background: fontSize === s ? 'var(--accent-warm)' : 'var(--bg-secondary)',
+                    color: fontSize === s ? '#fff' : 'var(--text-secondary)',
+                    fontFamily: 'var(--font-ui)',
+                    fontSize: 11,
+                    fontWeight: fontSize === s ? 600 : 400,
+                    cursor: 'pointer',
+                    borderRadius: 5,
+                    transition: 'all 120ms ease',
+                  }}
+                >
+                  {FONT_SIZE_LABELS[s]}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Layout */}
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              padding: '8px 14px',
+              gap: 16,
+              borderBottom: '1px solid var(--border)',
+            }}
+          >
+            <span
+              style={{
+                fontFamily: 'var(--font-ui)',
+                fontSize: 12,
+                color: 'var(--text-primary)',
+                userSelect: 'none',
+              }}
+            >
+              Layout
+            </span>
+            <div
+              style={{
+                display: 'flex',
+                background: 'var(--bg-secondary)',
+                borderRadius: 6,
+                padding: 2,
+              }}
+            >
+              {(['scroll', 'spread'] as LayoutMode[]).map((m) => (
+                <button
+                  key={m}
+                  onClick={() => onLayoutModeChange(m)}
+                  aria-pressed={layoutMode === m}
+                  style={{
+                    border: 'none',
+                    background: layoutMode === m ? 'var(--accent-warm)' : 'transparent',
+                    color: layoutMode === m ? '#fff' : 'var(--text-secondary)',
+                    fontFamily: 'var(--font-ui)',
+                    fontSize: 11,
+                    cursor: 'pointer',
+                    padding: '4px 8px',
+                    borderRadius: 5,
+                    fontWeight: layoutMode === m ? 600 : 400,
+                    transition: 'all 120ms ease',
+                  }}
+                >
+                  {m === 'scroll' ? 'Scroll' : '2 Page'}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Reading section */}
           <div
             style={{
               padding: '8px 14px 6px',

@@ -1,0 +1,99 @@
+<h2>AI Study Assistant — where does it live?</h2>
+<p class="subtitle">The assistant knows your book, notes, flashcards, and highlights</p>
+
+<div class="cards">
+
+  <div class="card" data-choice="a" onclick="toggleSelect(this)">
+    <div class="card-image" style="background:#F8F7F4;padding:12px;font-family:system-ui">
+      <div style="display:flex;gap:6px;height:150px">
+        <!-- Reader -->
+        <div style="flex:1;background:#fff;border-radius:8px;border:1px solid #e5e1da;overflow:hidden;display:flex;flex-direction:column">
+          <div style="background:#F0EDE8;padding:5px 8px;font-size:9px;color:#6B6560;display:flex;justify-content:space-between">
+            <span>Chapter 3</span>
+            <span style="color:#C4A882">✦</span>
+          </div>
+          <div style="padding:8px;font-size:9px;color:#3a3733;line-height:1.4;flex:1">The mitochondria is the powerhouse of the cell. Energy production occurs through...</div>
+        </div>
+        <!-- AI Panel -->
+        <div style="width:120px;background:#fff;border-radius:8px;border:1px solid #e5e1da;display:flex;flex-direction:column;overflow:hidden">
+          <div style="background:#1A1917;padding:5px 8px;font-size:9px;color:#fff;display:flex;align-items:center;gap:4px">
+            <span>✦</span><span>Study Assistant</span>
+          </div>
+          <div style="flex:1;padding:6px;display:flex;flex-direction:column;gap:4px;overflow:hidden">
+            <div style="background:#F0EDE8;border-radius:5px;padding:4px 6px;font-size:8px;color:#3a3733">What's the difference between ATP synthesis and glycolysis?</div>
+            <div style="background:#1A1917;border-radius:5px;padding:4px 6px;font-size:8px;color:#fff;margin-left:8px">ATP synthesis uses the proton gradient in mitochondria, while glycolysis occurs in the cytoplasm and doesn't require oxygen...</div>
+          </div>
+          <div style="padding:4px 6px;border-top:1px solid #e5e1da">
+            <div style="background:#F0EDE8;border-radius:4px;padding:3px 5px;font-size:8px;color:#B0ACA6">Ask anything...</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>A — Right-side chat panel (recommended)</h3>
+      <p>Slides in alongside the reader. Book stays readable. Persistent chat history. Quick-action buttons (Summarise, Generate flashcards) above the input. Knows current chapter + all your notes.</p>
+    </div>
+  </div>
+
+  <div class="card" data-choice="b" onclick="toggleSelect(this)">
+    <div class="card-image" style="background:#F8F7F4;padding:12px;font-family:system-ui">
+      <div style="position:relative;height:150px">
+        <!-- Reader behind -->
+        <div style="position:absolute;inset:0;background:#fff;border-radius:8px;border:1px solid #e5e1da;overflow:hidden;opacity:0.4">
+          <div style="background:#F0EDE8;padding:5px 8px;font-size:9px;color:#6B6560">Chapter 3</div>
+          <div style="padding:8px;font-size:9px;color:#3a3733;line-height:1.4">The mitochondria is the powerhouse of the cell...</div>
+        </div>
+        <!-- Floating modal -->
+        <div style="position:absolute;inset:12px;background:#fff;border-radius:10px;box-shadow:0 8px 32px rgba(0,0,0,0.2);display:flex;flex-direction:column;overflow:hidden">
+          <div style="background:#1A1917;padding:6px 10px;font-size:9px;color:#fff;display:flex;justify-content:space-between">
+            <span>✦ Study Assistant</span><span style="opacity:0.5">✕</span>
+          </div>
+          <div style="display:flex;border-bottom:1px solid #e5e1da">
+            <div style="flex:1;text-align:center;padding:4px;font-size:8px;color:#C4A882;border-bottom:2px solid #C4A882">Chat</div>
+            <div style="flex:1;text-align:center;padding:4px;font-size:8px;color:#B0ACA6">Summary</div>
+            <div style="flex:1;text-align:center;padding:4px;font-size:8px;color:#B0ACA6">Flashcards</div>
+          </div>
+          <div style="flex:1;padding:6px;font-size:8px;color:#6B6560">Full chat interface with tabs for different modes...</div>
+          <div style="padding:4px 6px;border-top:1px solid #e5e1da">
+            <div style="background:#F0EDE8;border-radius:4px;padding:3px 5px;font-size:8px;color:#B0ACA6">Ask anything...</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>B — Floating modal</h3>
+      <p>Sparkle button opens a centred modal over the reader. More screen space for chat. Tabs for Chat / Summary / Flashcards. But covers the book — can't read and chat simultaneously.</p>
+    </div>
+  </div>
+
+  <div class="card" data-choice="c" onclick="toggleSelect(this)">
+    <div class="card-image" style="background:#F8F7F4;padding:12px;font-family:system-ui">
+      <div style="height:150px;background:#fff;border-radius:8px;border:1px solid #e5e1da;overflow:hidden;display:flex;flex-direction:column">
+        <!-- Header -->
+        <div style="background:#F0EDE8;padding:5px 10px;font-size:9px;color:#6B6560;display:flex;justify-content:space-between">
+          <span>Chapter 3 — Cellular Respiration</span>
+          <span style="color:#C4A882">✦ Ask</span>
+        </div>
+        <!-- Split: text top, chat bottom -->
+        <div style="flex:1;padding:8px;font-size:9px;color:#3a3733;line-height:1.4;border-bottom:1px solid #e5e1da">The mitochondria is the powerhouse of the cell...</div>
+        <div style="height:55px;display:flex;flex-direction:column">
+          <div style="flex:1;padding:5px 8px;font-size:8px;color:#6B6560;background:#FAFAF8">
+            <span style="color:#C4A882">✦</span> ATP synthesis uses the proton gradient in the mitochondrial membrane...
+          </div>
+          <div style="padding:4px 6px;border-top:1px solid #e5e1da;background:#fff">
+            <div style="background:#F0EDE8;border-radius:4px;padding:2px 5px;font-size:8px;color:#B0ACA6">Ask about this chapter...</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>C — Inline bottom drawer</h3>
+      <p>Chat slides up from the bottom of the reader, splitting the screen. Book text stays visible above. Feels lightweight but cramped on smaller screens. Less space for longer AI responses.</p>
+    </div>
+  </div>
+
+</div>
+
+<div class="section" style="margin-top:16px;background:#F0EDE8;border-radius:8px;padding:12px 16px">
+  <p style="margin:0;font-size:13px;color:#6B6560"><strong style="color:#3a3733">Recommendation: A.</strong> The right-side panel mirrors how Notion AI, GitHub Copilot Chat, and other study tools work — persistent, non-blocking, contextually aware. You can read and chat at the same time. Quick-action buttons (Summarise chapter, Generate flashcards) sit above the input so the AI feels like more than just a chatbox.</p>
+</div>

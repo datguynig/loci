@@ -11,7 +11,7 @@ export type { Annotation }
 
 interface UseAnnotationsReturn {
   annotations: Annotation[]
-  addAnnotation: (href: string, quote: string, note: string) => Annotation
+  addAnnotation: (href: string, quote: string, note: string, type?: Annotation['type']) => Annotation
   removeAnnotation: (id: string) => void
   annotationsForHref: (href: string) => Annotation[]
 }
@@ -25,13 +25,14 @@ export function useAnnotations(bookId: string | null): UseAnnotationsReturn {
   }, [bookId])
 
   const addAnnotation = useCallback(
-    (href: string, quote: string, note: string): Annotation => {
+    (href: string, quote: string, note: string, type: Annotation['type'] = 'note'): Annotation => {
       const annotation: Annotation = {
         id: crypto.randomUUID(),
         bookId: bookId ?? '',
         href,
         quote,
         note,
+        type,
         createdAt: Date.now(),
       }
       saveAnnotation(annotation)

@@ -35,9 +35,13 @@ export interface UseSpeechReturn {
   sentences: string[]
 }
 
-export function useSpeech(): UseSpeechReturn {
+export function useSpeech(options?: { onEnded?: () => void }): UseSpeechReturn {
   const hasElevenLabsConfigured = hasElevenLabs()
   const [provider] = useState<TTSProvider>(resolveTtsProvider())
+
+  // Keep onEnded ref current so the playback loops don't close over a stale callback
+  const onEndedRef = useRef(options?.onEnded)
+  useEffect(() => { onEndedRef.current = options?.onEnded }, [options?.onEnded])
 
   const [isPlaying, setIsPlaying] = useState(false)
   const [isPaused, setIsPaused] = useState(false)
@@ -134,8 +138,10 @@ export function useSpeech(): UseSpeechReturn {
   const playElevenLabsSentence = useCallback(
     async (idx: number) => {
       if (!isPlayingRef.current || idx >= sentencesRef.current.length) {
+        const reachedEnd = isPlayingRef.current && idx >= sentencesRef.current.length
         setIsPlaying(false)
         isPlayingRef.current = false
+        if (reachedEnd) onEndedRef.current?.()
         return
       }
 
@@ -170,10 +176,12 @@ export function useSpeech(): UseSpeechReturn {
   const playBrowserSentence = useCallback(
     (idx: number) => {
       if (!isPlayingRef.current || idx >= sentencesRef.current.length) {
+        const reachedEnd = isPlayingRef.current && idx >= sentencesRef.current.length
         setIsPlaying(false)
         isPlayingRef.current = false
         window.speechSynthesis.cancel()
         stopChromeBugFix()
+        if (reachedEnd) onEndedRef.current?.()
         return
       }
 

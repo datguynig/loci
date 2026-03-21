@@ -1,0 +1,442 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Loci — Light Library + Notes Panel</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500;600&family=Lora:ital,wght@0,400;1,400&family=DM+Sans:wght@300;400;500;600&display=swap');
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: #F8F7F4; font-family: 'DM Sans', system-ui; color: #1a1a1a; overflow-x: hidden; }
+
+  /* ── NAV ── */
+  .nav {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 0 40px; height: 56px;
+    border-bottom: 1px solid rgba(0,0,0,0.07);
+    background: rgba(248,247,244,0.92); backdrop-filter: blur(20px);
+    position: sticky; top: 0; z-index: 20;
+  }
+  .wordmark { font-family: 'Playfair Display', serif; font-size: 20px; font-weight: 500; color: #1a1a1a; letter-spacing: -0.3px; }
+  .nav-right { display: flex; align-items: center; gap: 12px; }
+  .avatar { width: 30px; height: 30px; border-radius: 50%; background: #c4a882; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 600; color: #fff; cursor: pointer; }
+  .add-btn {
+    display: flex; align-items: center; gap: 5px;
+    background: #1a1a1a; color: #fff; border: none; border-radius: 8px;
+    padding: 7px 14px; font-family: 'DM Sans', system-ui; font-size: 13px; font-weight: 500;
+    cursor: pointer; transition: opacity 100ms;
+  }
+  .add-btn:hover { opacity: 0.82; }
+
+  /* ── CONTENT ── */
+  .page { padding: 36px 40px 80px; transition: filter 300ms; }
+  .page.dimmed { filter: brightness(0.97); }
+
+  /* ── CONTINUE READING ── */
+  .section-label { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.8px; color: #B0ACA6; margin-bottom: 16px; }
+
+  .continue-card {
+    display: flex; align-items: center; gap: 20px;
+    background: #fff; border: 1px solid rgba(0,0,0,0.07);
+    border-radius: 12px; padding: 18px 20px 18px 18px;
+    margin-bottom: 44px; cursor: pointer;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.05);
+    transition: box-shadow 150ms, transform 150ms;
+    max-width: 600px;
+  }
+  .continue-card:hover { box-shadow: 0 4px 20px rgba(0,0,0,0.1); transform: translateY(-1px); }
+  .continue-cover {
+    width: 48px; height: 72px; border-radius: 5px; flex-shrink: 0;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+  }
+  .continue-info { flex: 1; }
+  .continue-title { font-size: 14px; font-weight: 600; color: #1a1a1a; margin-bottom: 3px; }
+  .continue-author { font-size: 12px; color: #6B6560; margin-bottom: 10px; }
+  .progress-track { background: rgba(0,0,0,0.07); border-radius: 99px; height: 3px; width: 180px; }
+  .progress-fill { background: #c4a882; height: 100%; border-radius: 99px; }
+  .continue-meta { font-size: 11px; color: #B0ACA6; margin-top: 5px; }
+  .continue-cta {
+    font-size: 12px; font-weight: 600; color: #1a1a1a;
+    background: #F8F7F4; border: 1px solid rgba(0,0,0,0.1);
+    border-radius: 8px; padding: 8px 16px; white-space: nowrap; flex-shrink: 0;
+    transition: background 120ms;
+  }
+  .continue-card:hover .continue-cta { background: #EFEDE8; }
+
+  /* ── GRID ── */
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 32px 24px; }
+
+  .book-card { cursor: pointer; }
+  .book-cover-wrap { position: relative; margin-bottom: 10px; }
+  .book-cover {
+    width: 100%; aspect-ratio: 2/3; border-radius: 7px;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.14);
+    transition: transform 180ms ease, box-shadow 180ms ease;
+    position: relative; overflow: hidden;
+  }
+  .book-card:hover .book-cover { transform: translateY(-3px) scale(1.015); box-shadow: 0 10px 28px rgba(0,0,0,0.18); }
+
+  .book-cover-overlay {
+    position: absolute; inset: 0; opacity: 0;
+    transition: opacity 180ms;
+    background: linear-gradient(to top, rgba(0,0,0,0.55) 0%, rgba(0,0,0,0.05) 55%);
+    display: flex; align-items: flex-end; padding: 10px;
+  }
+  .book-card:hover .book-cover-overlay { opacity: 1; }
+  .open-label { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; color: #fff; }
+
+  .progress-strip { position: absolute; bottom: 0; left: 0; right: 0; height: 3px; background: rgba(255,255,255,0.2); }
+  .progress-strip-fill { height: 100%; background: #c4a882; }
+
+  .notes-badge {
+    position: absolute; top: 8px; right: 8px;
+    background: rgba(248,247,244,0.92); border: 1px solid rgba(0,0,0,0.1);
+    border-radius: 99px; padding: 2px 7px; font-size: 10px; font-weight: 600;
+    color: #6B6560; opacity: 0; transition: opacity 180ms;
+    display: flex; align-items: center; gap: 3px;
+    backdrop-filter: blur(8px); cursor: pointer;
+  }
+  .notes-badge:hover { background: #fff; color: #1a1a1a; }
+  .book-card:hover .notes-badge { opacity: 1; }
+
+  .book-title { font-size: 12px; font-weight: 500; color: #1a1a1a; line-height: 1.4; }
+  .book-author { font-size: 11px; color: #B0ACA6; margin-top: 2px; }
+
+  /* ── COVER COLORS ── */
+  .c1 { background: linear-gradient(160deg, #7a5c40 0%, #c9a97e 100%); }
+  .c2 { background: linear-gradient(160deg, #2d4860 0%, #6fa0c0 100%); }
+  .c3 { background: linear-gradient(160deg, #3e2a58 0%, #9464b8 100%); }
+  .c4 { background: linear-gradient(160deg, #2a4830 0%, #68a872 100%); }
+  .c5 { background: linear-gradient(160deg, #5a2828 0%, #c06868 100%); }
+
+  /* ── NOTES PANEL ── */
+  .panel-backdrop {
+    position: fixed; inset: 0; background: rgba(26,26,26,0.18);
+    z-index: 30; opacity: 0; pointer-events: none;
+    transition: opacity 280ms ease;
+  }
+  .panel-backdrop.open { opacity: 1; pointer-events: auto; }
+
+  .notes-panel {
+    position: fixed; right: 0; top: 0; bottom: 0;
+    width: 420px; background: #fff;
+    box-shadow: -4px 0 40px rgba(0,0,0,0.12);
+    z-index: 40; transform: translateX(100%);
+    transition: transform 300ms cubic-bezier(0.32, 0.72, 0, 1);
+    display: flex; flex-direction: column; overflow: hidden;
+  }
+  .notes-panel.open { transform: translateX(0); }
+
+  .panel-header {
+    display: flex; align-items: center; gap: 16px;
+    padding: 20px 24px 16px; border-bottom: 1px solid rgba(0,0,0,0.07);
+    flex-shrink: 0;
+  }
+  .panel-cover { width: 40px; height: 60px; border-radius: 4px; flex-shrink: 0; box-shadow: 0 2px 8px rgba(0,0,0,0.18); }
+  .panel-book-title { font-size: 14px; font-weight: 600; color: #1a1a1a; line-height: 1.35; }
+  .panel-book-author { font-size: 12px; color: #6B6560; margin-top: 2px; }
+  .panel-note-count { font-size: 11px; color: #B0ACA6; margin-top: 4px; }
+
+  .panel-close {
+    margin-left: auto; width: 28px; height: 28px; border-radius: 50%;
+    background: #F8F7F4; border: 1px solid rgba(0,0,0,0.08);
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer; flex-shrink: 0; font-size: 14px; color: #6B6560;
+    transition: background 100ms;
+  }
+  .panel-close:hover { background: #EFEDE8; }
+
+  .panel-actions {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 12px 24px; border-bottom: 1px solid rgba(0,0,0,0.06);
+    flex-shrink: 0;
+  }
+  .panel-action-label { font-size: 12px; color: #B0ACA6; }
+  .export-btn {
+    display: flex; align-items: center; gap: 5px;
+    font-size: 12px; font-weight: 500; color: #6B6560;
+    background: #F8F7F4; border: 1px solid rgba(0,0,0,0.1);
+    border-radius: 6px; padding: 5px 12px; cursor: pointer;
+    transition: background 100ms;
+  }
+  .export-btn:hover { background: #EFEDE8; color: #1a1a1a; }
+
+  .panel-notes { overflow-y: auto; flex: 1; padding: 8px 0; }
+
+  .note-item {
+    padding: 18px 24px;
+    border-bottom: 1px solid rgba(0,0,0,0.05);
+    transition: background 120ms; cursor: default;
+  }
+  .note-item:hover { background: #FAFAF9; }
+  .note-item:last-child { border-bottom: none; }
+
+  .note-chapter { font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; color: #c4a882; margin-bottom: 8px; }
+  .note-quote {
+    font-family: 'Lora', Georgia, serif; font-style: italic;
+    font-size: 13px; color: #6B6560; line-height: 1.65;
+    padding-left: 12px; border-left: 2px solid #c4a882;
+    margin-bottom: 8px;
+  }
+  .note-text { font-size: 13px; color: #1a1a1a; line-height: 1.6; }
+  .note-date { font-size: 11px; color: #B0ACA6; margin-top: 8px; }
+
+  .panel-empty {
+    flex: 1; display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    padding: 40px; text-align: center;
+  }
+  .panel-empty-icon { font-size: 32px; margin-bottom: 16px; opacity: 0.3; }
+  .panel-empty-text { font-size: 13px; color: #B0ACA6; line-height: 1.65; }
+</style>
+</head>
+<body>
+
+<!-- ── NAV ── -->
+<nav class="nav">
+  <span class="wordmark">Loci</span>
+  <div class="nav-right">
+    <button class="add-btn" onclick="showUploadHint()">
+      <span style="font-size:15px;line-height:1">+</span> Add book
+    </button>
+    <div class="avatar">N</div>
+  </div>
+</nav>
+
+<!-- ── CONTENT ── -->
+<div class="page" id="page">
+
+  <!-- Continue reading -->
+  <div class="section-label">Continue reading</div>
+  <div class="continue-card">
+    <div class="book-cover c1 continue-cover"></div>
+    <div class="continue-info">
+      <div class="continue-title">The Design of Everyday Things</div>
+      <div class="continue-author">Don Norman</div>
+      <div class="progress-track"><div class="progress-fill" style="width:67%"></div></div>
+      <div class="continue-meta">67% · Chapter 4 · Last read 2h ago</div>
+    </div>
+    <div class="continue-cta">Continue reading →</div>
+  </div>
+
+  <!-- Library grid -->
+  <div class="section-label">All books</div>
+  <div class="grid">
+
+    <div class="book-card">
+      <div class="book-cover-wrap">
+        <div class="book-cover c1">
+          <div class="book-cover-overlay"><span class="open-label">Read</span></div>
+          <div class="notes-badge" onclick="openNotes('doet', event)">✎ 8</div>
+          <div class="progress-strip"><div class="progress-strip-fill" style="width:67%"></div></div>
+        </div>
+      </div>
+      <div class="book-title">The Design of Everyday Things</div>
+      <div class="book-author">Don Norman</div>
+    </div>
+
+    <div class="book-card">
+      <div class="book-cover-wrap">
+        <div class="book-cover c2">
+          <div class="book-cover-overlay"><span class="open-label">Read</span></div>
+          <div class="notes-badge" onclick="openNotes('moby', event)">✎ 2</div>
+          <div class="progress-strip"><div class="progress-strip-fill" style="width:12%"></div></div>
+        </div>
+      </div>
+      <div class="book-title">Moby Dick</div>
+      <div class="book-author">Herman Melville</div>
+    </div>
+
+    <div class="book-card">
+      <div class="book-cover-wrap">
+        <div class="book-cover c3">
+          <div class="book-cover-overlay"><span class="open-label">Read</span></div>
+          <div class="notes-badge" onclick="openNotes('thinking', event)">✎ 5</div>
+          <div class="progress-strip"><div class="progress-strip-fill" style="width:34%"></div></div>
+        </div>
+      </div>
+      <div class="book-title">Thinking, Fast and Slow</div>
+      <div class="book-author">Daniel Kahneman</div>
+    </div>
+
+    <div class="book-card">
+      <div class="book-cover-wrap">
+        <div class="book-cover c4">
+          <div class="book-cover-overlay"><span class="open-label">Read</span></div>
+          <div class="notes-badge" onclick="openNotes('lean', event)">✎ 0</div>
+          <div class="progress-strip"><div class="progress-strip-fill" style="width:100%"></div></div>
+        </div>
+      </div>
+      <div class="book-title">The Lean Startup</div>
+      <div class="book-author">Eric Ries</div>
+    </div>
+
+    <div class="book-card">
+      <div class="book-cover-wrap">
+        <div class="book-cover c5">
+          <div class="book-cover-overlay"><span class="open-label">Read</span></div>
+          <div class="notes-badge" onclick="openNotes('deep', event)">✎ 3</div>
+          <div class="progress-strip"><div class="progress-strip-fill" style="width:5%"></div></div>
+        </div>
+      </div>
+      <div class="book-title">Deep Work</div>
+      <div class="book-author">Cal Newport</div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ── BACKDROP ── -->
+<div class="panel-backdrop" id="backdrop" onclick="closePanel()"></div>
+
+<!-- ── NOTES PANEL ── -->
+<div class="notes-panel" id="notesPanel">
+
+  <div class="panel-header">
+    <div class="book-cover c1 panel-cover" id="panelCover"></div>
+    <div>
+      <div class="panel-book-title" id="panelTitle"></div>
+      <div class="panel-book-author" id="panelAuthor"></div>
+      <div class="panel-note-count" id="panelCount"></div>
+    </div>
+    <div class="panel-close" onclick="closePanel()">✕</div>
+  </div>
+
+  <div class="panel-actions">
+    <span class="panel-action-label" id="panelActionLabel"></span>
+    <button class="export-btn">↗ Export as Markdown</button>
+  </div>
+
+  <div class="panel-notes" id="panelNotes"></div>
+</div>
+
+<script>
+const books = {
+  doet: {
+    title: 'The Design of Everyday Things',
+    author: 'Don Norman',
+    color: 'c1',
+    notes: [
+      {
+        chapter: 'Chapter 2 — The Psychology of Everyday Actions',
+        quote: 'We bridge the gulf of execution through action and the gulf of evaluation through perception and interpretation.',
+        text: 'Core mental model — every interaction has these two gulfs. Design should minimise both.',
+        date: 'Mar 18'
+      },
+      {
+        chapter: 'Chapter 2 — The Psychology of Everyday Actions',
+        quote: 'Affordances determine what actions are possible. Signifiers communicate where the action should take place.',
+        text: 'Affordances vs signifiers — I always confused these. Affordance is the relationship, signifier is the perceptible signal.',
+        date: 'Mar 18'
+      },
+      {
+        chapter: 'Chapter 3 — Knowledge in the Head and in the World',
+        quote: 'Precise behaviour can emerge from imprecise knowledge because the environment constrains the set of possible actions.',
+        text: 'This explains why we don\'t need to memorise everything — the world acts as external memory.',
+        date: 'Mar 19'
+      },
+    ]
+  },
+  moby: {
+    title: 'Moby Dick',
+    author: 'Herman Melville',
+    color: 'c2',
+    notes: [
+      {
+        chapter: 'Chapter 1 — Loomings',
+        quote: 'Call me Ishmael.',
+        text: 'Three of the most famous words in American literature. Ishmael isn\'t his real name — deliberate anonymity.',
+        date: 'Mar 15'
+      },
+      {
+        chapter: 'Chapter 3 — The Spouter-Inn',
+        quote: 'Better sleep with a sober cannibal than a drunken Christian.',
+        text: 'Melville subverting expectations immediately.',
+        date: 'Mar 15'
+      }
+    ]
+  },
+  thinking: {
+    title: 'Thinking, Fast and Slow',
+    author: 'Daniel Kahneman',
+    color: 'c3',
+    notes: [
+      {
+        chapter: 'Part 1 — Two Systems',
+        quote: 'System 1 operates automatically and quickly, with little or no effort and no sense of voluntary control.',
+        text: 'The whole book is basically an elaboration of this one distinction.',
+        date: 'Mar 10'
+      },
+      {
+        chapter: 'Part 2 — Heuristics and Biases',
+        quote: 'A reliable way to make people believe in falsehoods is frequent repetition, because familiarity is not easily distinguished from truth.',
+        text: 'The illusory truth effect — relevant to everything from advertising to politics.',
+        date: 'Mar 11'
+      },
+    ]
+  },
+  lean: {
+    title: 'The Lean Startup',
+    author: 'Eric Ries',
+    color: 'c4',
+    notes: []
+  },
+  deep: {
+    title: 'Deep Work',
+    author: 'Cal Newport',
+    color: 'c5',
+    notes: [
+      {
+        chapter: 'Part 1 — The Idea',
+        quote: 'Deep work is the ability to focus without distraction on a cognitively demanding task.',
+        text: 'The core definition. Everything else in the book builds from here.',
+        date: 'Mar 5'
+      },
+    ]
+  }
+}
+
+function openNotes(bookId, event) {
+  event.stopPropagation()
+  const book = books[bookId]
+  const panel = document.getElementById('notesPanel')
+  const backdrop = document.getElementById('backdrop')
+
+  document.getElementById('panelCover').className = 'book-cover ' + book.color + ' panel-cover'
+  document.getElementById('panelTitle').textContent = book.title
+  document.getElementById('panelAuthor').textContent = book.author
+  document.getElementById('panelCount').textContent = book.notes.length + ' notes'
+  document.getElementById('panelActionLabel').textContent = book.notes.length + ' notes across all chapters'
+
+  const notesEl = document.getElementById('panelNotes')
+  if (book.notes.length === 0) {
+    notesEl.innerHTML = '<div class="panel-empty"><div class="panel-empty-icon">✎</div><div class="panel-empty-text">No notes yet.<br>Select any text while reading to add one.</div></div>'
+  } else {
+    notesEl.innerHTML = book.notes.map(n => `
+      <div class="note-item">
+        <div class="note-chapter">${n.chapter}</div>
+        <div class="note-quote">${n.quote}</div>
+        <div class="note-text">${n.text}</div>
+        <div class="note-date">${n.date}</div>
+      </div>
+    `).join('')
+  }
+
+  panel.classList.add('open')
+  backdrop.classList.add('open')
+  document.getElementById('page').classList.add('dimmed')
+}
+
+function closePanel() {
+  document.getElementById('notesPanel').classList.remove('open')
+  document.getElementById('backdrop').classList.remove('open')
+  document.getElementById('page').classList.remove('dimmed')
+}
+
+function showUploadHint() {
+  alert('Upload modal would open here')
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,166 @@
+<h2>AI Study Assistant — panel design</h2>
+<p class="subtitle">How it looks and feels inside the reader</p>
+
+<div style="display:flex;gap:20px;align-items:flex-start;flex-wrap:wrap">
+
+  <!-- Full reader mockup -->
+  <div style="flex:2;min-width:320px">
+    <div style="font-size:11px;color:#B0ACA6;letter-spacing:0.06em;text-transform:uppercase;margin-bottom:8px">Full reader view with AI panel open</div>
+    <div style="background:#F8F7F4;border-radius:12px;border:1px solid #E5E1DA;overflow:hidden;box-shadow:0 8px 32px rgba(0,0,0,0.08)">
+
+      <!-- Reader header -->
+      <div style="background:#F8F7F4;padding:10px 16px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid rgba(0,0,0,0.06)">
+        <div style="display:flex;align-items:center;gap:8px">
+          <div style="width:16px;height:12px;display:flex;flex-direction:column;gap:3px">
+            <div style="height:1.5px;background:#B0ACA6;border-radius:1px"></div>
+            <div style="height:1.5px;background:#B0ACA6;border-radius:1px"></div>
+            <div style="height:1.5px;background:#B0ACA6;border-radius:1px"></div>
+          </div>
+          <span style="font-family:'Georgia',serif;font-size:12px;color:#3a3733;font-weight:600">Pride and Prejudice</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:6px">
+          <button style="width:26px;height:26px;border:none;background:transparent;border-radius:6px;font-size:11px;color:#B0ACA6;cursor:pointer">🔍</button>
+          <button style="width:26px;height:26px;border:none;background:transparent;border-radius:6px;font-size:11px;color:#B0ACA6;cursor:pointer">🔖</button>
+          <button style="width:26px;height:26px;border:none;background:transparent;border-radius:6px;font-size:11px;color:#B0ACA6;cursor:pointer">✎</button>
+          <button style="width:26px;height:26px;border:none;background:#1A1917;border-radius:6px;font-size:11px;color:#C4A882;cursor:pointer">✦</button>
+          <button style="width:26px;height:26px;border:none;background:transparent;border-radius:6px;font-size:11px;color:#B0ACA6;cursor:pointer">☀</button>
+        </div>
+      </div>
+
+      <div style="display:flex;height:340px">
+
+        <!-- EPUB text area -->
+        <div style="flex:1;padding:20px 24px;overflow:hidden;border-right:1px solid rgba(0,0,0,0.06)">
+          <div style="font-size:9px;color:#B0ACA6;letter-spacing:0.08em;text-transform:uppercase;margin-bottom:12px">Chapter III</div>
+          <p style="font-family:'Georgia',serif;font-size:11px;color:#1A1A1A;line-height:1.8;margin:0 0 10px">It is a truth universally acknowledged, that a single man in possession of a good fortune, must be in want of a wife.</p>
+          <p style="font-family:'Georgia',serif;font-size:11px;color:#1A1A1A;line-height:1.8;margin:0 0 10px">However little known the feelings or views of such a man may be on his first entering a neighbourhood, this truth is so well fixed in the minds of the surrounding families...</p>
+          <p style="font-family:'Georgia',serif;font-size:11px;color:#3a3733;line-height:1.8;margin:0;opacity:0.5">that he is considered as the rightful property of some one or other of their daughters.</p>
+        </div>
+
+        <!-- AI Panel -->
+        <div style="width:220px;background:#fff;display:flex;flex-direction:column">
+
+          <!-- Panel header -->
+          <div style="padding:10px 14px;border-bottom:1px solid rgba(0,0,0,0.06);display:flex;align-items:center;justify-content:space-between">
+            <div style="display:flex;align-items:center;gap:6px">
+              <span style="font-size:12px;color:#C4A882">✦</span>
+              <span style="font-family:system-ui;font-size:11px;font-weight:600;color:#1A1917;letter-spacing:-0.01em">Study Assistant</span>
+            </div>
+            <button style="border:none;background:transparent;font-size:11px;color:#B0ACA6;cursor:pointer;padding:2px">✕</button>
+          </div>
+
+          <!-- Chat thread -->
+          <div style="flex:1;padding:10px 12px;display:flex;flex-direction:column;gap:8px;overflow:hidden">
+
+            <!-- Context pill -->
+            <div style="display:flex;justify-content:center">
+              <div style="background:#F0EDE8;border-radius:20px;padding:3px 10px;font-family:system-ui;font-size:8px;color:#8A8780">Chapter III · Pride and Prejudice</div>
+            </div>
+
+            <!-- User message -->
+            <div style="display:flex;justify-content:flex-end">
+              <div style="background:#1A1917;border-radius:10px 10px 2px 10px;padding:6px 10px;max-width:80%">
+                <p style="margin:0;font-family:system-ui;font-size:9px;color:#F0EDE8;line-height:1.5">What is Austen saying about society in the opening line?</p>
+              </div>
+            </div>
+
+            <!-- AI response -->
+            <div style="display:flex;gap:6px">
+              <div style="width:16px;height:16px;background:#C4A882;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:8px;color:#fff;margin-top:2px">✦</div>
+              <div style="background:#F8F7F4;border-radius:2px 10px 10px 10px;padding:8px 10px;flex:1">
+                <p style="margin:0;font-family:'Georgia',serif;font-size:9px;color:#1A1A1A;line-height:1.6">Austen opens with irony — the "universally acknowledged" truth is immediately undermined. She's satirising how Regency society reduced women to commodities and marriage to an economic transaction...</p>
+              </div>
+            </div>
+
+            <!-- Inline flashcard -->
+            <div style="background:linear-gradient(135deg,#F8F7F4,#F0EDE8);border:1px solid #E5E1DA;border-radius:8px;padding:8px 10px;position:relative">
+              <div style="font-family:system-ui;font-size:7px;color:#B0ACA6;letter-spacing:0.06em;text-transform:uppercase;margin-bottom:4px">Flashcard saved ✦</div>
+              <div style="font-family:'Georgia',serif;font-size:9px;color:#3a3733;font-style:italic">"It is a truth universally acknowledged..."</div>
+              <div style="margin-top:4px;padding-top:4px;border-top:1px solid #E5E1DA;font-family:system-ui;font-size:8px;color:#6B6560">Austen uses irony to satirise the marriage market...</div>
+            </div>
+
+          </div>
+
+          <!-- Smart chips + input -->
+          <div style="padding:8px 10px;border-top:1px solid rgba(0,0,0,0.06)">
+            <!-- Chips -->
+            <div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:6px">
+              <button style="background:#F0EDE8;border:1px solid #E5E1DA;border-radius:20px;padding:3px 8px;font-family:system-ui;font-size:8px;color:#6B6560;cursor:pointer;white-space:nowrap">Summarise chapter</button>
+              <button style="background:#F0EDE8;border:1px solid #E5E1DA;border-radius:20px;padding:3px 8px;font-family:system-ui;font-size:8px;color:#6B6560;cursor:pointer;white-space:nowrap">Quiz me</button>
+              <button style="background:#F0EDE8;border:1px solid #E5E1DA;border-radius:20px;padding:3px 8px;font-family:system-ui;font-size:8px;color:#6B6560;cursor:pointer;white-space:nowrap">Make flashcards</button>
+            </div>
+            <!-- Input -->
+            <div style="display:flex;align-items:center;gap:6px;background:#F8F7F4;border:1px solid #E5E1DA;border-radius:8px;padding:5px 8px">
+              <input style="flex:1;border:none;background:transparent;font-family:system-ui;font-size:9px;color:#3a3733;outline:none" placeholder="Ask anything about this chapter..." />
+              <button style="width:18px;height:18px;background:#1A1917;border:none;border-radius:5px;color:#fff;font-size:9px;cursor:pointer;display:flex;align-items:center;justify-content:center">↑</button>
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Side annotations: chip states + flashcard flip -->
+  <div style="flex:1;min-width:220px;display:flex;flex-direction:column;gap:16px">
+
+    <!-- Chip states -->
+    <div>
+      <div style="font-size:11px;color:#B0ACA6;letter-spacing:0.06em;text-transform:uppercase;margin-bottom:8px">Smart chips — context-aware</div>
+      <div style="background:#fff;border-radius:10px;border:1px solid #E5E1DA;overflow:hidden">
+        <div style="padding:8px 12px;border-bottom:1px solid #F0EDE8">
+          <div style="font-size:9px;color:#B0ACA6;margin-bottom:4px">Reading a chapter</div>
+          <div style="display:flex;flex-wrap:wrap;gap:3px">
+            <span style="background:#F0EDE8;border:1px solid #E5E1DA;border-radius:20px;padding:2px 7px;font-size:8px;color:#6B6560">Summarise chapter</span>
+            <span style="background:#F0EDE8;border:1px solid #E5E1DA;border-radius:20px;padding:2px 7px;font-size:8px;color:#6B6560">Quiz me</span>
+            <span style="background:#F0EDE8;border:1px solid #E5E1DA;border-radius:20px;padding:2px 7px;font-size:8px;color:#6B6560">Make flashcards</span>
+          </div>
+        </div>
+        <div style="padding:8px 12px;border-bottom:1px solid #F0EDE8">
+          <div style="font-size:9px;color:#B0ACA6;margin-bottom:4px">Text selected in book</div>
+          <div style="display:flex;flex-wrap:wrap;gap:3px">
+            <span style="background:#1A1917;border-radius:20px;padding:2px 7px;font-size:8px;color:#C4A882">Explain this</span>
+            <span style="background:#F0EDE8;border:1px solid #E5E1DA;border-radius:20px;padding:2px 7px;font-size:8px;color:#6B6560">Save as flashcard</span>
+          </div>
+        </div>
+        <div style="padding:8px 12px;border-bottom:1px solid #F0EDE8">
+          <div style="font-size:9px;color:#B0ACA6;margin-bottom:4px">Has chapter notes</div>
+          <div style="display:flex;flex-wrap:wrap;gap:3px">
+            <span style="background:#F0EDE8;border:1px solid #E5E1DA;border-radius:20px;padding:2px 7px;font-size:8px;color:#6B6560">Review my notes</span>
+            <span style="background:#F0EDE8;border:1px solid #E5E1DA;border-radius:20px;padding:2px 7px;font-size:8px;color:#6B6560">Quiz from notes</span>
+          </div>
+        </div>
+        <div style="padding:8px 12px">
+          <div style="font-size:9px;color:#B0ACA6;margin-bottom:4px">Has saved flashcards</div>
+          <div style="display:flex;flex-wrap:wrap;gap:3px">
+            <span style="background:#F0EDE8;border:1px solid #E5E1DA;border-radius:20px;padding:2px 7px;font-size:8px;color:#6B6560">Review flashcards</span>
+            <span style="background:#F0EDE8;border:1px solid #E5E1DA;border-radius:20px;padding:2px 7px;font-size:8px;color:#6B6560">Test me</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Flashcard flip states -->
+    <div>
+      <div style="font-size:11px;color:#B0ACA6;letter-spacing:0.06em;text-transform:uppercase;margin-bottom:8px">Flashcard in chat thread</div>
+      <div style="display:flex;gap:8px">
+        <div style="flex:1;background:linear-gradient(135deg,#F8F7F4,#F0EDE8);border:1px solid #E5E1DA;border-radius:10px;padding:10px;text-align:center">
+          <div style="font-size:8px;color:#B0ACA6;margin-bottom:6px;letter-spacing:0.05em">FRONT</div>
+          <div style="font-family:'Georgia',serif;font-size:10px;color:#1A1917;font-style:italic">"universally acknowledged"</div>
+          <div style="margin-top:8px;font-size:8px;color:#C4A882">tap to flip →</div>
+        </div>
+        <div style="flex:1;background:#1A1917;border-radius:10px;padding:10px;text-align:center">
+          <div style="font-size:8px;color:#C4A882;margin-bottom:6px;letter-spacing:0.05em">BACK</div>
+          <div style="font-family:system-ui;font-size:9px;color:#F0EDE8;line-height:1.4">Irony — Austen critiques how society treated marriage as economic necessity</div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<div class="section" style="margin-top:20px;background:#F0EDE8;border-radius:8px;padding:12px 16px">
+  <p style="margin:0;font-size:12px;color:#6B6560;line-height:1.6">
+    <strong style="color:#1A1917">Design principles:</strong> Warm paper tones throughout — no harsh whites, no cold greys. The ✦ sparkle icon is the AI's identity mark. User messages sit dark + right; AI responses sit warm + left with the ✦ avatar. Flashcards drop into the thread as cards and are auto-saved. Chips adapt to context — never more than 3 visible at once.
+  </p>
+</div>

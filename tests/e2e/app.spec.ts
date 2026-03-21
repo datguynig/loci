@@ -65,6 +65,12 @@ function playPauseBtn(page: Page) {
   return page.locator('button[aria-label="Play"], button[aria-label="Pause"]').first()
 }
 
+// Open reader settings popover via gear button
+async function openSettings(page: Page) {
+  await page.getByRole('button', { name: 'Reader settings' }).click()
+  await expect(page.getByRole('dialog', { name: 'Reader settings' })).toBeVisible()
+}
+
 // ─── Landing Page ──────────────────────────────────────────────────────────
 
 test.describe('Landing page', () => {
@@ -108,10 +114,13 @@ test.describe('Reader layout', () => {
   test('header is visible with title and controls', async ({ page }) => {
     await expect(page.getByText('Test Book')).toBeVisible()
     await expect(page.getByLabel('Toggle table of contents')).toBeVisible()
-    await expect(page.getByLabel('Font size sm')).toBeVisible()
-    await expect(page.getByLabel('Font size xl')).toBeVisible()
-    await expect(page.getByLabel('Scroll layout')).toBeVisible()
-    await expect(page.getByLabel('Two page layout')).toBeVisible()
+    // Font size and layout controls live in the settings popover
+    await openSettings(page)
+    const dialog = page.getByRole('dialog', { name: 'Reader settings' })
+    await expect(dialog.getByLabel('Font size sm')).toBeVisible()
+    await expect(dialog.getByLabel('Font size xl')).toBeVisible()
+    await expect(dialog.getByRole('button', { name: 'Scroll' })).toBeVisible()
+    await expect(dialog.getByRole('button', { name: '2 Page' })).toBeVisible()
   })
 
   test('AudioBar is in flow and not hiding behind viewport edge', async ({ page }) => {
@@ -143,13 +152,18 @@ test.describe('Reader layout', () => {
   })
 
   test('layout controls switch active mode', async ({ page }) => {
-    await expect(page.getByLabel('Scroll layout')).toHaveAttribute('aria-pressed', 'true')
-    await page.getByLabel('Two page layout').click()
-    await expect(page.getByLabel('Two page layout')).toHaveAttribute('aria-pressed', 'true')
+    await openSettings(page)
+    const dialog = page.getByRole('dialog', { name: 'Reader settings' })
+    await expect(dialog.getByRole('button', { name: 'Scroll' })).toHaveAttribute('aria-pressed', 'true')
+    await dialog.getByRole('button', { name: '2 Page' }).click()
+    await expect(dialog.getByRole('button', { name: '2 Page' })).toHaveAttribute('aria-pressed', 'true')
   })
 
   test('spread mode enables page or chapter transport scope', async ({ page }) => {
-    await page.getByLabel('Two page layout').click()
+    await openSettings(page)
+    await page.getByRole('dialog', { name: 'Reader settings' }).getByRole('button', { name: '2 Page' }).click()
+    // click outside to close popover
+    await page.mouse.click(400, 300)
     await expect(page.getByLabel('Previous page')).toBeVisible()
     await page.getByLabel('Navigate by chapter').click()
     await expect(page.getByLabel('Previous chapter')).toBeVisible()
@@ -188,7 +202,9 @@ test.describe('Chapter navigation', () => {
   })
 
   test('page navigation buttons keep epub rendered', async ({ page }) => {
-    await page.getByLabel('Two page layout').click()
+    await openSettings(page)
+    await page.getByRole('dialog', { name: 'Reader settings' }).getByRole('button', { name: '2 Page' }).click()
+    await page.mouse.click(400, 300)
     await page.getByLabel('Next page').click()
     await page.waitForTimeout(400)
     await page.getByLabel('Previous page').click()
@@ -197,7 +213,9 @@ test.describe('Chapter navigation', () => {
   })
 
   test('multi-step page navigation dismisses loading overlay', async ({ page }) => {
-    await page.getByLabel('Two page layout').click()
+    await openSettings(page)
+    await page.getByRole('dialog', { name: 'Reader settings' }).getByRole('button', { name: '2 Page' }).click()
+    await page.mouse.click(400, 300)
     for (let i = 0; i < 6; i++) {
       await page.getByLabel('Next page').click()
       await page.waitForTimeout(280)
@@ -289,7 +307,9 @@ test.describe('Frankenstein EPUB regression', () => {
     test.skip(!frankensteinAvailable, 'public/ebooks/Frankenstein.epub not present')
     await loadFrankenstein(page)
     await waitForBookReady(page)
-    await page.getByLabel('Two page layout').click()
+    await openSettings(page)
+    await page.getByRole('dialog', { name: 'Reader settings' }).getByRole('button', { name: '2 Page' }).click()
+    await page.mouse.click(400, 300)
     for (let i = 0; i < 5; i++) {
       await page.getByLabel('Next page').click()
       await page.waitForTimeout(300)
@@ -410,24 +430,27 @@ test.describe('Font size controls', () => {
   })
 
   test('starts with md as the active font size', async ({ page }) => {
+    await openSettings(page)
     await expect(page.getByLabel('Font size md')).toHaveAttribute('aria-pressed', 'true')
   })
 
   test('clicking XL font size marks it as active', async ({ page }) => {
+    await openSettings(page)
     await page.getByLabel('Font size xl').click()
     await expect(page.getByLabel('Font size xl')).toHaveAttribute('aria-pressed', 'true')
     await expect(page.getByLabel('Font size md')).toHaveAttribute('aria-pressed', 'false')
   })
 
   test('+ keyboard shortcut increases font size', async ({ page }) => {
-    await expect(page.getByLabel('Font size md')).toHaveAttribute('aria-pressed', 'true')
     await page.keyboard.press('+')
+    await openSettings(page)
     await expect(page.getByLabel('Font size lg')).toHaveAttribute('aria-pressed', 'true')
   })
 
   test('- keyboard shortcut decreases font size', async ({ page }) => {
     await page.keyboard.press('+')
     await page.keyboard.press('-')
+    await openSettings(page)
     await expect(page.getByLabel('Font size md')).toHaveAttribute('aria-pressed', 'true')
   })
 })
@@ -698,13 +721,12 @@ test.describe('Reader settings', () => {
   })
 
   test('preferences persist across page reload', async ({ page }) => {
-    // Change font size to XL
-    await page.getByRole('button', { name: 'Font size xl', exact: false }).click()
-    await expect(page.getByRole('button', { name: 'Font size xl', exact: false }))
-      .toHaveAttribute('aria-pressed', 'true')
+    // Change font size to XL via settings popover
+    await openSettings(page)
+    await page.getByLabel('Font size xl').click()
+    await expect(page.getByLabel('Font size xl')).toHaveAttribute('aria-pressed', 'true')
 
     // Disable highlight
-    await page.getByRole('button', { name: 'Reader settings' }).click()
     await page.getByRole('switch', { name: 'Sentence highlight' }).click()
 
     // Reload the page (without re-uploading — preferences are in localStorage)
@@ -719,11 +741,10 @@ test.describe('Reader settings', () => {
     await waitForBookReady(page)
 
     // Font size XL should still be active
-    await expect(page.getByRole('button', { name: 'Font size xl', exact: false }))
-      .toHaveAttribute('aria-pressed', 'true')
+    await openSettings(page)
+    await expect(page.getByLabel('Font size xl')).toHaveAttribute('aria-pressed', 'true')
 
     // Highlight should still be off
-    await page.getByRole('button', { name: 'Reader settings' }).click()
     await expect(page.getByRole('switch', { name: 'Sentence highlight' }))
       .toHaveAttribute('aria-checked', 'false')
   })

@@ -1,17 +1,35 @@
-import { useState, useEffect, useCallback, useRef } from 'react'
-import { motion } from 'framer-motion'
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
+import { motion, AnimatePresence } from 'framer-motion'
+import type { SupabaseClient } from '@supabase/supabase-js'
+import { useUser } from '@clerk/clerk-react'
 import { useEpub, type FontSize, type Theme, type LayoutMode } from '../hooks/useEpub'
 import { useSpeech } from '../hooks/useSpeech'
 import { useAnnotations } from '../hooks/useAnnotations'
+import { useBookmarks } from '../hooks/useBookmarks'
+import { useReadingProgress } from '../hooks/useReadingProgress'
+import { useFlashcards } from '../hooks/useFlashcards'
+import { useScratchpad } from '../hooks/useScratchpad'
+import {
+  saveAnnotationToSupabase,
+  deleteAnnotationFromSupabase,
+} from '../services/annotationService'
+import { exportAnnotationsAsMarkdown, exportAnnotationsAsJSON } from '../utils/exportAnnotations'
 import Sidebar from './Sidebar'
+import SearchPanel from './SearchPanel'
 import AudioBar from './AudioBar'
 import ProgressBar from './ProgressBar'
 import ThemeToggle from './ThemeToggle'
 import Toast, { type ToastMessage } from './Toast'
 import SelectionBubble from './SelectionBubble'
+import StudyPanel from './StudyPanel'
+import Scratchpad from './Scratchpad'
+import type { StudyContext } from '../services/aiStudyService'
+
 
 interface ReaderProps {
   file: File
+  bookId?: string | null
+  supabase?: SupabaseClient | null
   theme: Theme
   fontSize: FontSize
   layoutMode: LayoutMode
@@ -22,14 +40,17 @@ interface ReaderProps {
   onLayoutModeChange: (mode: LayoutMode) => void
   onHighlightChange: (v: boolean) => void
   onAutoscrollChange: (v: boolean) => void
+  onClose?: () => void
+  studyOptions?: { panel?: 'scratchpad'; chapterHref?: string }
 }
 
 const FONT_SIZE_ORDER: FontSize[] = ['sm', 'md', 'lg', 'xl']
-const FONT_SIZE_LABELS: Record<FontSize, string> = { sm: 'S', md: 'M', lg: 'L', xl: 'XL' }
 const CONTENT_TRANSITION = { duration: 0.2, ease: 'easeOut' as const }
 
 export default function Reader({
   file,
+  bookId = null,
+  supabase = null,
   theme,
   fontSize,
   layoutMode,
@@ -40,13 +61,34 @@ export default function Reader({
   onLayoutModeChange,
   onHighlightChange,
   onAutoscrollChange,
+  onClose,
+  studyOptions,
 }: ReaderProps) {
+  const { user } = useUser()
+  const userId = user?.id ?? ''
   const epub = useEpub({ fontSize, theme, layoutMode, highlightEnabled, autoscrollEnabled })
-  const speech = useSpeech()
+
+  // Cross-chapter TTS: when a chapter ends naturally, advance and resume
+  const autoAdvancePendingRef = useRef(false)
+  const handleTTSEnded = useCallback(() => {
+    autoAdvancePendingRef.current = true
+    epub.nextChapter()
+  }, [epub.nextChapter])
+
+  const speech = useSpeech({ onEnded: handleTTSEnded })
   const annotations = useAnnotations(epub.book?.key() ?? null)
+  const bookmarks = useBookmarks(supabase, userId || null, bookId ?? null)
+  const flashcards = useFlashcards(supabase as SupabaseClient, userId, bookId ?? '')
+  const scratchpad = useScratchpad(supabase as SupabaseClient, userId, bookId ?? '')
 
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [settingsOpen, setSettingsOpen] = useState(false)
+  const [notesOpen, setNotesOpen] = useState(false)
+  const [searchOpen, setSearchOpen] = useState(false)
+  const [studyPanelOpen, setStudyPanelOpen] = useState(false)
+  const [scratchpadOpen, setScratchpadOpen] = useState(false)
+  const [chapterNoteOpen, setChapterNoteOpen] = useState(false)
+  const [chapterNoteText, setChapterNoteText] = useState('')
   const [toasts, setToasts] = useState<ToastMessage[]>([])
   const [selection, setSelection] = useState<{
     quote: string
@@ -66,8 +108,40 @@ export default function Reader({
       return !o
     })
   }
+
+  // Panel exclusivity handlers
+  const openStudyPanel = () => {
+    setStudyPanelOpen(true)
+    setScratchpadOpen(false)
+    setNotesOpen(false)
+  }
+  const openScratchpad = () => {
+    setScratchpadOpen(true)
+    setStudyPanelOpen(false)
+    setNotesOpen(false)
+  }
+
+  // Handle studyOptions deep-link on mount
+  useEffect(() => {
+    if (studyOptions?.chapterHref) {
+      setStudyPanelOpen(true)
+    } else if (studyOptions?.panel === 'scratchpad') {
+      setScratchpadOpen(true)
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
   const [navigationScope, setNavigationScope] = useState<'page' | 'chapter'>(
     layoutMode === 'scroll' ? 'chapter' : 'page',
+  )
+
+  // Reading progress autosave + restore
+  useReadingProgress(
+    supabase,
+    bookId ?? null,
+    epub.currentHref,
+    epub.progress,
+    epub.goToHref,
   )
 
   // BUG-17: toast counter in ref, not module scope
@@ -138,6 +212,14 @@ export default function Reader({
     epub.prevChapter()
   }, [speech, clearSentenceHighlight, epub.prevChapter])
 
+  // Cross-chapter TTS auto-advance: speak new chapter once it finishes rendering
+  useEffect(() => {
+    if (!autoAdvancePendingRef.current || !epub.hasRenderedContent) return
+    autoAdvancePendingRef.current = false
+    const text = epub.getCurrentText()
+    if (text) speech.speak(text)
+  }, [epub.hasRenderedContent, epub.currentHref, epub.getCurrentText, speech.speak])
+
   // TTS reading highlight — glow the paragraph being spoken
   const { highlightSentence } = epub
   useEffect(() => {
@@ -166,6 +248,26 @@ export default function Reader({
   useEffect(() => {
     closeSelection()
   }, [currentHref])
+
+  // Bookmark toggle for current chapter
+  const isCurrentPageBookmarked = bookmarks.bookmarks.some(
+    (b) => b.href.split('#')[0] === epub.currentHref.split('#')[0],
+  )
+
+  const handleToggleBookmark = useCallback(() => {
+    const norm = epub.currentHref.split('#')[0]
+    const existing = bookmarks.bookmarks.find((b) => b.href.split('#')[0] === norm)
+    if (existing) {
+      bookmarks.removeBookmark(existing.id)
+    } else {
+      const tocItem = epub.toc.find((item) => {
+        const itemNorm = item.href.split('#')[0]
+        return itemNorm === norm || itemNorm.endsWith('/' + norm) || norm.endsWith('/' + itemNorm)
+      })
+      const label = tocItem?.label?.trim() ?? `Chapter ${epub.currentChapter}`
+      bookmarks.addBookmark(epub.currentHref, label)
+    }
+  }, [bookmarks, epub.currentHref, epub.toc, epub.currentChapter])
 
   // BUG-05: destructure stable callbacks/values so the effect only re-runs when they change
   const { goToHref, toc, currentChapterIndex, getCurrentText } = epub
@@ -273,15 +375,26 @@ export default function Reader({
     onFontSizeChange,
   ])
 
-  const layoutOptions: Array<{ mode: LayoutMode; label: string; short: string }> = [
-    { mode: 'scroll', label: 'Scroll layout', short: 'Scroll' },
-    { mode: 'spread', label: 'Two page layout', short: '2 Page' },
-  ]
-
   const readingStatus =
     navigationScope === 'chapter'
       ? (epub.totalChapters > 0 ? `Chapter ${epub.currentChapter} of ${epub.totalChapters}` : '')
       : (epub.totalPages > 0 ? `Page ${epub.currentPage} of ${epub.totalPages}` : '')
+
+  const studyContext = useMemo<StudyContext>(() => ({
+    chapterText: epub.getFullChapterText(),
+    chapterNotes: annotations.annotations
+      .filter(a => {
+        const base = (currentHref ?? '').split('#')[0]
+        return a.href.split('#')[0] === base && a.type === 'chapter_note'
+      })
+      .map(a => a.note ?? ''),
+    scratchpad: scratchpad.content,
+    annotations: annotations.annotations
+      .filter(a => a.type === 'note' && a.note)
+      .map(a => ({ quote: a.quote, note: a.note ?? '' })),
+    flashcards: flashcards.flashcards.map(f => ({ front: f.front, back: f.back })),
+    selectedText: selection?.quote ?? null,
+  }), [annotations.annotations, currentHref, scratchpad.content, flashcards.flashcards, selection, epub.getFullChapterText])
 
   return (
     <motion.div
@@ -315,8 +428,29 @@ export default function Reader({
           gap: 8,
         }}
       >
-        {/* Left: hamburger + title */}
+        {/* Left: back + hamburger + title */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, flex: 1, minWidth: 0 }}>
+          {onClose && (
+            <button
+              onClick={onClose}
+              aria-label="Back to library"
+              style={{
+                background: 'none',
+                border: 'none',
+                cursor: 'pointer',
+                padding: 4,
+                color: 'var(--text-secondary)',
+                borderRadius: 4,
+                display: 'flex',
+                alignItems: 'center',
+                flexShrink: 0,
+              }}
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <polyline points="15 18 9 12 15 6" />
+              </svg>
+            </button>
+          )}
           <button
             onClick={() => setSidebarOpen((o) => !o)}
             aria-label="Toggle table of contents"
@@ -366,7 +500,7 @@ export default function Reader({
           {epub.totalPages > 0 && `${epub.currentPage} / ${epub.totalPages}`}
         </div>
 
-        {/* Right: font controls + theme toggle */}
+        {/* Right: action buttons */}
         <div
           style={{
             display: 'flex',
@@ -374,74 +508,132 @@ export default function Reader({
             gap: 4,
             flex: 1,
             justifyContent: 'flex-end',
-            flexWrap: 'wrap',
           }}
         >
-          <div
+          {/* Search button */}
+          <button
+            onClick={() => setSearchOpen((o) => !o)}
+            aria-label="Search in book"
+            aria-pressed={searchOpen}
             style={{
+              background: searchOpen ? 'rgba(196,168,130,0.15)' : 'transparent',
+              border: searchOpen ? '1px solid rgba(196,168,130,0.4)' : '1px solid transparent',
+              borderRadius: 6,
+              cursor: 'pointer',
+              padding: '5px 7px',
+              color: searchOpen ? '#C4A882' : 'var(--text-secondary)',
               display: 'flex',
-              background: 'var(--bg-secondary)',
-              borderRadius: 999,
-              padding: 2,
-              border: '1px solid var(--border)',
+              alignItems: 'center',
+              transition: 'all 150ms ease',
             }}
           >
-            {layoutOptions.map((option) => (
-              <button
-                key={option.mode}
-                onClick={() => onLayoutModeChange(option.mode)}
-                aria-label={option.label}
-                aria-pressed={layoutMode === option.mode}
-                style={{
-                  border: 'none',
-                  background: layoutMode === option.mode ? 'var(--bg-primary)' : 'transparent',
-                  color: layoutMode === option.mode ? 'var(--text-primary)' : 'var(--text-secondary)',
-                  fontFamily: 'var(--font-ui)',
-                  fontSize: 11,
-                  cursor: 'pointer',
-                  padding: '5px 9px',
-                  borderRadius: 999,
-                  fontWeight: layoutMode === option.mode ? 600 : 500,
-                }}
-              >
-                {option.short}
-              </button>
-            ))}
-          </div>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <circle cx="11" cy="11" r="8" />
+              <line x1="21" y1="21" x2="16.65" y2="16.65" />
+            </svg>
+          </button>
 
-          {/* Font size buttons */}
-          <div style={{ display: 'flex', gap: 1 }}>
-            {FONT_SIZE_ORDER.map((s) => (
-              <button
-                key={s}
-                onClick={() => onFontSizeChange(s)}
-                aria-label={`Font size ${s}`}
-                aria-pressed={fontSize === s}
-                style={{
-                  width: 26,
-                  height: 26,
-                  border: 'none',
-                  background: fontSize === s ? 'var(--bg-secondary)' : 'transparent',
-                  color: fontSize === s ? 'var(--text-primary)' : 'var(--text-tertiary)',
-                  fontFamily: 'var(--font-ui)',
-                  fontSize: 11,
-                  fontWeight: fontSize === s ? 600 : 400,
-                  cursor: 'pointer',
-                  borderRadius: 4,
-                  transition: 'all 120ms ease',
-                }}
-              >
-                {FONT_SIZE_LABELS[s]}
-              </button>
-            ))}
-          </div>
+          {/* Bookmark button */}
+          <button
+            onClick={handleToggleBookmark}
+            aria-label={isCurrentPageBookmarked ? 'Remove bookmark' : 'Bookmark this page'}
+            aria-pressed={isCurrentPageBookmarked}
+            style={{
+              background: isCurrentPageBookmarked ? 'rgba(196,168,130,0.15)' : 'transparent',
+              border: isCurrentPageBookmarked ? '1px solid rgba(196,168,130,0.4)' : '1px solid transparent',
+              borderRadius: 6,
+              cursor: 'pointer',
+              padding: '5px 7px',
+              color: isCurrentPageBookmarked ? '#C4A882' : 'var(--text-secondary)',
+              display: 'flex',
+              alignItems: 'center',
+              transition: 'all 150ms ease',
+            }}
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill={isCurrentPageBookmarked ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2">
+              <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z" />
+            </svg>
+          </button>
+
+          <button
+            onClick={() => {
+              const opening = !notesOpen
+              setNotesOpen(opening)
+              if (opening) {
+                setStudyPanelOpen(false)
+                setScratchpadOpen(false)
+              }
+            }}
+            aria-label="Toggle notes pane"
+            aria-pressed={notesOpen}
+            style={{
+              background: notesOpen ? 'rgba(196,168,130,0.15)' : 'transparent',
+              border: notesOpen ? '1px solid rgba(196,168,130,0.4)' : '1px solid transparent',
+              borderRadius: 6,
+              cursor: 'pointer',
+              padding: '5px 6px',
+              color: notesOpen ? '#C4A882' : 'var(--text-secondary)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              transition: 'all 150ms ease',
+            }}
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+              <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+            </svg>
+          </button>
+
+          {/* Scratchpad button */}
+          <button
+            onClick={openScratchpad}
+            aria-label="Scratchpad"
+            style={{
+              width: 32,
+              height: 32,
+              border: 'none',
+              background: scratchpadOpen ? 'var(--bg-secondary)' : 'transparent',
+              borderRadius: 8,
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              color: scratchpadOpen ? 'var(--text-primary)' : 'var(--text-secondary)',
+              fontSize: 16,
+            }}
+          >
+            📓
+          </button>
+
+          {/* Study button */}
+          <button
+            onClick={openStudyPanel}
+            aria-label="Study assistant"
+            style={{
+              width: 32,
+              height: 32,
+              border: 'none',
+              background: studyPanelOpen ? '#1A1917' : 'transparent',
+              borderRadius: 8,
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              color: studyPanelOpen ? 'var(--accent-warm)' : 'var(--text-secondary)',
+              fontSize: 14,
+              fontWeight: 600,
+            }}
+          >
+            ✦
+          </button>
 
           <ThemeToggle theme={theme} onToggle={onThemeToggle} />
         </div>
       </motion.header>
 
       {/* Main content area */}
-      <div style={{ flex: 1, position: 'relative', overflow: 'hidden' }}>
+      <div style={{ flex: 1, display: 'flex', overflow: 'hidden', position: 'relative' }}>
         {/* Sidebar */}
         <Sidebar
           toc={epub.toc}
@@ -453,8 +645,23 @@ export default function Reader({
           onDeleteAnnotation={(id) => {
             removeAnnotation(id)
             applyAnnotationHighlights(annotationsForHref(epub.currentHref))
+            if (supabase) deleteAnnotationFromSupabase(supabase, id).catch(console.error)
           }}
+          bookmarks={bookmarks.bookmarks}
+          onDeleteBookmark={bookmarks.removeBookmark}
         />
+
+        {/* Search panel — overlays the epub viewer from the top */}
+        <AnimatePresence>
+          {searchOpen && (
+            <SearchPanel
+              onSearch={epub.searchBook}
+              onNavigate={epub.goToHref}
+              onClose={() => setSearchOpen(false)}
+              toc={epub.toc}
+            />
+          )}
+        </AnimatePresence>
 
         {/* epub.js viewer */}
         <motion.div
@@ -489,11 +696,15 @@ export default function Reader({
               quote={selection.quote}
               position={selection.pos}
               onSave={(note) => {
-                addAnnotation(selection.href, selection.quote, note)
+                const saved = addAnnotation(selection.href, selection.quote, note)
                 closeSelection()
                 // Re-apply highlights so the new underline appears immediately
                 setTimeout(() => applyAnnotationHighlights(annotationsForHref(selection.href)), 50)
                 addToast('Note saved')
+                // Sync to Supabase in background
+                if (supabase && bookId && user) {
+                  saveAnnotationToSupabase(supabase, user.id, bookId, saved).catch(console.error)
+                }
               }}
               onDismiss={closeSelection}
             />
@@ -550,6 +761,245 @@ export default function Reader({
               </p>
             </div>
           </motion.div>
+        )}
+
+        {/* Inline notes pane */}
+        <AnimatePresence>
+          {notesOpen && (
+            <motion.div
+              initial={{ x: 320 }}
+              animate={{ x: 0 }}
+              exit={{ x: 320 }}
+              transition={{ type: 'spring', damping: 28, stiffness: 260 }}
+              style={{
+                position: 'absolute',
+                top: 0,
+                right: 0,
+                bottom: 0,
+                width: 320,
+                background: 'var(--bg-surface)',
+                borderLeft: '1px solid var(--border)',
+                display: 'flex',
+                flexDirection: 'column',
+                zIndex: 20,
+              }}
+            >
+              <div style={{
+                padding: '12px 16px',
+                borderBottom: '1px solid var(--border)',
+                fontFamily: 'var(--font-ui)',
+                fontSize: 12,
+                fontWeight: 600,
+                color: 'var(--text-secondary)',
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                flexShrink: 0,
+              }}>
+                <span>Notes ({annotations.annotations.length})</span>
+                {annotations.annotations.length > 0 && (
+                  <div style={{ display: 'flex', gap: 4 }}>
+                    <button
+                      onClick={() => exportAnnotationsAsMarkdown(epub.title ?? 'Notes', annotations.annotations)}
+                      title="Export as Markdown"
+                      style={{
+                        background: 'none',
+                        border: '1px solid var(--border)',
+                        borderRadius: 5,
+                        padding: '3px 8px',
+                        fontFamily: 'var(--font-ui)',
+                        fontSize: 11,
+                        color: 'var(--text-secondary)',
+                        cursor: 'pointer',
+                      }}
+                    >↗ MD</button>
+                    <button
+                      onClick={() => exportAnnotationsAsJSON(epub.title ?? 'Notes', annotations.annotations)}
+                      title="Export as JSON"
+                      style={{
+                        background: 'none',
+                        border: '1px solid var(--border)',
+                        borderRadius: 5,
+                        padding: '3px 8px',
+                        fontFamily: 'var(--font-ui)',
+                        fontSize: 11,
+                        color: 'var(--text-secondary)',
+                        cursor: 'pointer',
+                      }}
+                    >↗ JSON</button>
+                  </div>
+                )}
+              </div>
+              <div style={{ flex: 1, overflowY: 'auto', padding: '12px 16px' }}>
+                {annotations.annotations.length === 0 ? (
+                  <p style={{
+                    fontFamily: 'var(--font-ui)',
+                    fontSize: 13,
+                    color: 'var(--text-tertiary)',
+                    textAlign: 'center',
+                    marginTop: 40,
+                    lineHeight: 1.5,
+                  }}>
+                    No notes yet.<br />Select text to add one.
+                  </p>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+                    {annotations.annotations.map((a) => (
+                      <div
+                        key={a.id}
+                        style={{
+                          borderLeft: `2px solid ${a.href === epub.currentHref ? '#C4A882' : 'var(--border)'}`,
+                          background: a.href === epub.currentHref ? 'rgba(196,168,130,0.06)' : 'transparent',
+                          paddingLeft: 10,
+                          paddingTop: 4,
+                          paddingBottom: 4,
+                          borderRadius: '0 4px 4px 0',
+                          transition: 'all 200ms ease',
+                        }}
+                      >
+                        <p style={{
+                          fontFamily: 'var(--font-serif)',
+                          fontSize: 12,
+                          fontStyle: 'italic',
+                          color: 'var(--text-secondary)',
+                          margin: '0 0 4px',
+                          lineHeight: 1.5,
+                        }}>"{a.quote}"</p>
+                        {a.note && (
+                          <p style={{
+                            fontFamily: 'var(--font-ui)',
+                            fontSize: 12,
+                            color: 'var(--text-primary)',
+                            margin: '0 0 4px',
+                            lineHeight: 1.4,
+                          }}>{a.note}</p>
+                        )}
+                        <p style={{
+                          fontFamily: 'var(--font-ui)',
+                          fontSize: 11,
+                          color: 'var(--text-tertiary)',
+                          margin: 0,
+                        }}>{new Date(a.createdAt).toLocaleDateString()}</p>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* StudyPanel */}
+        <AnimatePresence>
+          {studyPanelOpen && supabase && userId && (
+            <StudyPanel
+              isOpen={studyPanelOpen}
+              onClose={() => setStudyPanelOpen(false)}
+              userId={userId}
+              context={studyContext}
+              supabase={supabase}
+              chapterHref={currentHref ?? ''}
+              onFlashcardsGenerated={(cards, href) => flashcards.addFlashcards(href, cards)}
+              reviewMode={studyOptions?.chapterHref ? { chapterHref: studyOptions.chapterHref } : undefined}
+              reviewFlashcards={
+                studyOptions?.chapterHref
+                  ? flashcards.flashcards
+                      .filter(f => f.chapterHref === studyOptions.chapterHref)
+                      .map(f => ({ front: f.front, back: f.back }))
+                  : undefined
+              }
+            />
+          )}
+        </AnimatePresence>
+
+        {/* Scratchpad */}
+        <AnimatePresence>
+          {scratchpadOpen && (
+            <Scratchpad
+              isOpen={scratchpadOpen}
+              onClose={() => setScratchpadOpen(false)}
+              content={scratchpad.content}
+              onChange={scratchpad.setContent}
+              saving={scratchpad.saving}
+            />
+          )}
+        </AnimatePresence>
+
+        {/* Chapter note floating action button */}
+        <button
+          onClick={() => setChapterNoteOpen(true)}
+          aria-label="Add chapter note"
+          style={{
+            position: 'absolute',
+            bottom: 60,
+            right: 16,
+            zIndex: 10,
+            background: 'var(--bg-surface)',
+            border: '1px solid var(--border)',
+            borderRadius: 20,
+            padding: '6px 14px',
+            fontFamily: '"DM Sans", system-ui, sans-serif',
+            fontSize: 12,
+            color: 'var(--text-secondary)',
+            cursor: 'pointer',
+            boxShadow: '0 2px 8px var(--shadow)',
+          }}
+        >
+          + Note
+        </button>
+
+        {/* Chapter note inline editor */}
+        {chapterNoteOpen && (
+          <div style={{
+            position: 'absolute',
+            bottom: 100,
+            right: 16,
+            zIndex: 20,
+            background: 'var(--bg-surface)',
+            border: '1px solid var(--border)',
+            borderRadius: 10,
+            padding: 12,
+            width: 260,
+            boxShadow: '0 8px 32px rgba(0,0,0,0.14)',
+          }}>
+            <textarea
+              autoFocus
+              value={chapterNoteText}
+              onChange={e => setChapterNoteText(e.target.value)}
+              placeholder="Add a note for this chapter…"
+              rows={4}
+              style={{
+                width: '100%',
+                boxSizing: 'border-box',
+                border: '1px solid var(--border)',
+                borderRadius: 8,
+                padding: '8px 10px',
+                fontFamily: '"DM Sans", system-ui, sans-serif',
+                fontSize: 13,
+                color: 'var(--text-primary)',
+                background: 'var(--bg-secondary)',
+                outline: 'none',
+                resize: 'none',
+                lineHeight: 1.55,
+              }}
+            />
+            <div style={{ display: 'flex', gap: 8, marginTop: 8, justifyContent: 'flex-end' }}>
+              <button
+                onClick={() => { setChapterNoteOpen(false); setChapterNoteText('') }}
+                style={{ background: 'none', border: '1px solid var(--border)', borderRadius: 8, padding: '5px 12px', fontSize: 12, cursor: 'pointer', color: 'var(--text-secondary)' }}
+              >Cancel</button>
+              <button
+                onClick={() => {
+                  if (chapterNoteText.trim()) {
+                    addAnnotation(currentHref ?? '', '', chapterNoteText.trim(), 'chapter_note')
+                  }
+                  setChapterNoteOpen(false)
+                  setChapterNoteText('')
+                }}
+                style={{ background: '#1A1917', border: 'none', borderRadius: 8, padding: '5px 12px', fontSize: 12, cursor: 'pointer', color: '#fff', fontWeight: 600 }}
+              >Save</button>
+            </div>
+          </div>
         )}
       </div>
 
@@ -687,6 +1137,10 @@ export default function Reader({
         onStop={speech.stop}
         onSkipForward={speech.skipForward}
         onSkipBack={speech.skipBack}
+        fontSize={fontSize}
+        onFontSizeChange={onFontSizeChange}
+        layoutMode={layoutMode}
+        onLayoutModeChange={onLayoutModeChange}
         highlightEnabled={highlightEnabled}
         onHighlightChange={onHighlightChange}
         autoscrollEnabled={autoscrollEnabled}
