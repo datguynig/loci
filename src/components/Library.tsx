@@ -131,24 +131,40 @@ export default function Library({ supabase, onOpenBook }: LibraryProps) {
           color: '#1A1917',
           letterSpacing: '-0.3px',
         }}>Loci</span>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           <button
+            type="button"
             onClick={() => fileInputRef.current?.click()}
             disabled={isUploading}
             style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 8,
               background: '#1A1917',
               color: '#FFFFFF',
               border: 'none',
-              borderRadius: 8,
-              padding: '8px 16px',
+              borderRadius: 999,
+              padding: '10px 20px 10px 18px',
               fontFamily: '"DM Sans", system-ui, sans-serif',
               fontSize: 13,
-              fontWeight: 500,
+              fontWeight: 600,
+              letterSpacing: '-0.01em',
               cursor: isUploading ? 'not-allowed' : 'pointer',
-              opacity: isUploading ? 0.6 : 1,
+              opacity: isUploading ? 0.65 : 1,
+              boxShadow: '0 1px 2px rgba(0,0,0,0.06), 0 6px 20px rgba(26,25,23,0.18)',
+              transition: 'box-shadow 180ms ease, opacity 180ms ease, filter 180ms ease',
             }}
           >
-            {isUploading ? 'Uploading…' : '+ Add book'}
+            {isUploading ? (
+              'Uploading…'
+            ) : (
+              <>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.25" strokeLinecap="round" aria-hidden>
+                  <path d="M12 5v14M5 12h14" />
+                </svg>
+                Add book
+              </>
+            )}
           </button>
           <UserButton />
         </div>
@@ -369,15 +385,15 @@ function ContinueBanner({
 }) {
   const [hovered, setHovered] = useState(false)
   return (
-    <div style={{ marginBottom: 40 }}>
+    <div style={{ marginBottom: 44 }}>
       <p style={{
         fontFamily: '"DM Sans", system-ui, sans-serif',
         fontSize: 11,
         fontWeight: 600,
         color: '#8A8680',
-        letterSpacing: '0.08em',
+        letterSpacing: '0.1em',
         textTransform: 'uppercase',
-        margin: '0 0 10px',
+        margin: '0 0 12px',
       }}>Continue reading</p>
       <div
         onMouseEnter={() => setHovered(true)}
@@ -385,103 +401,150 @@ function ContinueBanner({
         style={{
           display: 'flex',
           alignItems: 'center',
-          gap: 14,
-          background: '#FFFFFF',
-          border: '1px solid #EAE7E1',
-          borderRadius: 10,
-          padding: '14px 18px',
-          maxWidth: 480,
-          boxShadow: hovered ? '0 2px 16px rgba(0,0,0,0.08)' : 'none',
-          transition: 'box-shadow 180ms ease',
+          gap: 16,
+          maxWidth: 560,
+          padding: '16px 18px 16px 16px',
+          borderRadius: 14,
+          background: 'linear-gradient(145deg, #FFFFFF 0%, #FAF9F7 55%, #F5F3EF 100%)',
+          border: '1px solid rgba(26,25,23,0.08)',
+          boxShadow: hovered
+            ? '0 1px 2px rgba(0,0,0,0.04), 0 16px 48px rgba(26,25,23,0.1)'
+            : '0 1px 2px rgba(0,0,0,0.04), 0 8px 28px rgba(26,25,23,0.06)',
+          transition: 'box-shadow 220ms ease, transform 220ms ease',
+          transform: hovered && !opening ? 'translateY(-1px)' : 'none',
         }}
       >
-        {book.coverUrl ? (
-          <img
-            src={book.coverUrl}
-            alt={book.title}
-            style={{ width: 40, height: 60, objectFit: 'cover', borderRadius: 3, flexShrink: 0 }}
-          />
-        ) : (
-          <div style={{
-            width: 40,
-            height: 60,
-            borderRadius: 3,
-            flexShrink: 0,
-            background: '#EAE7E1',
+        <button
+          type="button"
+          disabled={opening}
+          onClick={onOpen}
+          aria-label={opening ? undefined : `Resume reading ${book.title}`}
+          style={{
+            flex: 1,
+            minWidth: 0,
             display: 'flex',
             alignItems: 'center',
-            justifyContent: 'center',
-          }}>
-            <span style={{ fontSize: 18 }}>📖</span>
-          </div>
-        )}
-        <div
-          onClick={opening ? undefined : onOpen}
-          style={{ flex: 1, minWidth: 0, cursor: opening ? 'default' : 'pointer' }}
+            gap: 18,
+            padding: 0,
+            margin: 0,
+            border: 'none',
+            background: 'none',
+            cursor: opening ? 'default' : 'pointer',
+            textAlign: 'left',
+            font: 'inherit',
+            color: 'inherit',
+          }}
         >
           <div style={{
-            fontFamily: '"Lora", Georgia, serif',
-            fontSize: 14,
-            fontWeight: 600,
-            color: '#1A1917',
+            position: 'relative',
+            flexShrink: 0,
+            borderRadius: 6,
             overflow: 'hidden',
-            textOverflow: 'ellipsis',
-            whiteSpace: 'nowrap',
-          }}>{book.title}</div>
-          {book.author && (
+            boxShadow: '0 4px 14px rgba(0,0,0,0.12), 0 0 0 1px rgba(0,0,0,0.06)',
+          }}>
+            {book.coverUrl ? (
+              <img
+                src={book.coverUrl}
+                alt=""
+                style={{ width: 52, height: 78, objectFit: 'cover', display: 'block' }}
+              />
+            ) : (
+              <div style={{
+                width: 52,
+                height: 78,
+                background: 'linear-gradient(160deg, #E8E4DC, #D8D4CD)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}>
+                <span style={{ fontSize: 22, opacity: 0.5 }} aria-hidden>📖</span>
+              </div>
+            )}
+          </div>
+
+          <div style={{ minWidth: 0, flex: 1, paddingRight: 8 }}>
             <div style={{
-              fontFamily: '"DM Sans", system-ui, sans-serif',
-              fontSize: 12,
-              color: '#8A8680',
-              marginTop: 2,
-            }}>{book.author}</div>
-          )}
-          {readingSeconds > 0 && (
-            <div style={{
-              fontFamily: '"DM Sans", system-ui, sans-serif',
-              fontSize: 11,
-              color: '#B0ADA8',
-              marginTop: 1,
-            }}>
-              {formatDuration(readingSeconds)} read
-            </div>
-          )}
-        </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+              fontFamily: '"Lora", Georgia, serif',
+              fontSize: 15,
+              fontWeight: 600,
+              color: '#1A1917',
+              lineHeight: 1.35,
+              display: '-webkit-box',
+              WebkitLineClamp: 2,
+              WebkitBoxOrient: 'vertical',
+              overflow: 'hidden',
+            }}>{book.title}</div>
+            {book.author && (
+              <div style={{
+                fontFamily: '"DM Sans", system-ui, sans-serif',
+                fontSize: 12,
+                fontWeight: 500,
+                color: '#6B6560',
+                marginTop: 5,
+                lineHeight: 1.4,
+                display: '-webkit-box',
+                WebkitLineClamp: 2,
+                WebkitBoxOrient: 'vertical',
+                overflow: 'hidden',
+                wordBreak: 'break-word',
+              }}>{book.author}</div>
+            )}
+            {readingSeconds > 0 && (
+              <div style={{
+                fontFamily: '"DM Sans", system-ui, sans-serif',
+                fontSize: 11,
+                fontWeight: 500,
+                color: '#B0ADA8',
+                marginTop: 6,
+                letterSpacing: '0.02em',
+              }}>
+                {formatDuration(readingSeconds)} read
+              </div>
+            )}
+          </div>
+
           <span
-            onClick={opening ? undefined : onOpen}
             style={{
+              flexShrink: 0,
               fontFamily: '"DM Sans", system-ui, sans-serif',
               fontSize: 12,
-              color: '#C4A882',
-              fontWeight: 500,
-              cursor: opening ? 'default' : 'pointer',
+              fontWeight: 600,
+              letterSpacing: '0.04em',
+              color: opening ? '#8A8680' : '#C4A882',
+              padding: '10px 4px 10px 12px',
             }}
           >
-            {opening ? 'Opening…' : 'Continue →'}
+            {opening ? 'Opening…' : 'Resume →'}
           </span>
-          {!opening && (
-            <button
-              onClick={(e) => { e.stopPropagation(); onDetail() }}
-              aria-label="Book details"
-              style={{
-                background: 'rgba(0,0,0,0.05)',
-                border: 'none',
-                borderRadius: 5,
-                padding: '3px 7px',
-                fontFamily: '"DM Sans", system-ui, sans-serif',
-                fontSize: 13,
-                fontWeight: 600,
-                color: '#8A8680',
-                cursor: 'pointer',
-                lineHeight: 1,
-                letterSpacing: '0.05em',
-              }}
-            >
-              ···
-            </button>
-          )}
-        </div>
+        </button>
+
+        {!opening && (
+          <button
+            type="button"
+            onClick={() => onDetail()}
+            aria-label="Book details and study"
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              flexShrink: 0,
+              width: 40,
+              height: 40,
+              borderRadius: 10,
+              background: 'rgba(26,25,23,0.04)',
+              border: '1px solid rgba(26,25,23,0.08)',
+              cursor: 'pointer',
+              color: '#6B6560',
+              transition: 'background 150ms ease, border-color 150ms ease, color 150ms ease',
+            }}
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
+              <circle cx="5" cy="12" r="2" />
+              <circle cx="12" cy="12" r="2" />
+              <circle cx="19" cy="12" r="2" />
+            </svg>
+          </button>
+        )}
       </div>
     </div>
   )
@@ -515,8 +578,8 @@ function BookGrid({
       )}
       <div style={{
         display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))',
-        gap: '28px 20px',
+        gridTemplateColumns: 'repeat(auto-fill, minmax(148px, 1fr))',
+        gap: '32px 22px',
       }}>
         {books.map((book) => (
           <BookCard
@@ -638,10 +701,10 @@ function BookCard({
         )}
       </div>
 
-      <div style={{ marginTop: 8 }}>
+      <div style={{ marginTop: 10 }}>
         <div style={{
           fontFamily: '"Lora", Georgia, serif',
-          fontSize: 12,
+          fontSize: 13,
           fontWeight: 600,
           color: '#1A1917',
           lineHeight: 1.35,
@@ -654,11 +717,15 @@ function BookCard({
           <div style={{
             fontFamily: '"DM Sans", system-ui, sans-serif',
             fontSize: 11,
+            fontWeight: 500,
             color: '#8A8680',
-            marginTop: 2,
+            marginTop: 4,
+            lineHeight: 1.4,
+            display: '-webkit-box',
+            WebkitLineClamp: 2,
+            WebkitBoxOrient: 'vertical',
             overflow: 'hidden',
-            textOverflow: 'ellipsis',
-            whiteSpace: 'nowrap',
+            wordBreak: 'break-word',
           }}>{book.author}</div>
         )}
       </div>
