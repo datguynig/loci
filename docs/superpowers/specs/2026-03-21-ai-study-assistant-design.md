@@ -1,7 +1,7 @@
 # AI Study Assistant — Design Spec
 
 **Date:** 2026-03-21
-**Status:** Approved (revised after spec review)
+**Status:** Approved (revised after two spec reviews)
 
 ---
 
@@ -330,6 +330,33 @@ export function useFlashcards(supabase, userId, bookId) {
 }
 ```
 
+### `useAnnotations` hook — updated `addAnnotation` signature
+
+The existing `addAnnotation` helper in `useAnnotations.ts` constructs and saves an `Annotation` internally. It must accept an optional `type` parameter:
+
+```typescript
+// Current (inferred from usage):
+addAnnotation: (href: string, quote: string, note: string) => void
+
+// Updated:
+addAnnotation: (href: string, quote: string, note: string, type: Annotation['type'] = 'note') => void
+```
+
+The `Annotation` object constructed inside the hook passes `type` through to both localStorage and `saveAnnotationToSupabase`.
+
+The `+ Note` floating button in `Reader.tsx` calls:
+```typescript
+addAnnotation(currentHref, '', noteText, 'chapter_note')
+```
+
+The existing `SelectionBubble` save path calls (unchanged):
+```typescript
+addAnnotation(selectedHref, quote, note)   // type defaults to 'note'
+```
+
+There is no separate `addChapterNote` helper — the same `addAnnotation` function handles both types via the optional `type` argument.
+```
+
 ### `src/hooks/useScratchpad.ts`
 
 ```typescript
@@ -414,7 +441,14 @@ Plain `<textarea>`, no rich text. DM Sans 14px, `lineHeight: 1.7`, `background: 
 
 ## `useEpub` Changes
 
-Add `getFullChapterText(): string` to the `UseEpubReturn` interface and implementation. This method walks `rendition.getContents()` to access the rendered chapter's full document and extracts `document.body.innerText`, giving complete chapter text regardless of layout mode (scroll or paginated).
+Add `getFullChapterText(): string` to the `UseEpubReturn` interface and implementation:
+
+```typescript
+// In UseEpubReturn interface — add alongside getCurrentText:
+getFullChapterText: () => string
+```
+
+Implementation: calls `rendition.getContents()` which returns the full rendered chapter document (not just the visible page), then extracts `contents.document.body.innerText`. Returns `''` if no chapter is loaded. This gives complete chapter text regardless of layout mode (scroll or paginated).
 
 ---
 
@@ -444,6 +478,10 @@ Opening one closes the others.
 ### Chapter note floating button
 
 A `+ Note` floating action button sits at the bottom-right of the epub container, `position: absolute`, `bottom: 60px` (above nav bar), `right: 16px`, `zIndex: 10`. Style: `background: var(--bg-surface)`, `border: 1px solid var(--border)`, `borderRadius: 20px`, `padding: 6px 14px`, DM Sans 12px. Tapping it opens a small inline note editor (same visual as SelectionBubble but without the quote preview). On save, dispatches an annotation with `type: 'chapter_note'` and `quote: ''`.
+
+### Supabase write-through for chapter notes
+
+`Reader.tsx` already calls `saveAnnotationToSupabase` after `addAnnotation` succeeds for highlight annotations. The same code path handles chapter notes — `addAnnotation` now receives `type: 'chapter_note'`, and the `useAnnotations` hook passes `annotation.type` to `saveAnnotationToSupabase` (which now forwards it rather than hardcoding `'note'`). No separate write path is required.
 
 ### Context assembly
 
@@ -485,7 +523,20 @@ The Sidebar **Notes tab** renders a unified list. Each item is checked for `type
 
 The `deleteAnnotation` handler in the sidebar works identically for both types (uses `id`).
 
-The existing **export functions** in `exportAnnotations.ts` need updating: Markdown export should render chapter notes without a quote block. JSON export passes through the `type` field.
+The existing **export functions** in `exportAnnotations.ts` need updating:
+
+**Markdown export** — branch on `type`:
+```typescript
+// type === 'note' (existing):
+> ${a.quote}
+${a.note}
+
+// type === 'chapter_note' (new — no quote block):
+📝 Chapter note
+${a.note}
+```
+
+**JSON export** — pass `type` through in the exported object (it is already present on the `Annotation` interface after the migration).
 
 ---
 
@@ -500,7 +551,7 @@ onStudy?: (opts: { panel?: 'scratchpad'; chapterHref?: string }) => void
 **On mount**, load in parallel:
 1. `getAnnotationsFromSupabase(supabase, bookId)` (existing)
 2. `getFlashcards(supabase, bookId)` (new)
-3. `getScratchpad(supabase, bookId)` (new — first 200 chars sufficient for preview)
+3. `getScratchpad(supabase, bookId)` (new — returns full content; the modal renders only the first 200 characters as a preview, truncated in JSX: `scratchpad.slice(0, 200)`)
 4. `loadProgress(supabase, bookId)` (existing)
 
 **Stats card** replaces the standalone reading-time `<p>` in the left panel. Four rows: Reading time, Flashcards (gold if > 0), Chapter notes (gold if > 0), Highlights. The chapter notes count is `annotations.filter(a => a.type === 'chapter_note').length`.
