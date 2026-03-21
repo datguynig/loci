@@ -590,20 +590,22 @@ export default function Reader({
             onClick={openScratchpad}
             aria-label="Scratchpad"
             style={{
-              width: 32,
-              height: 32,
-              border: 'none',
-              background: scratchpadOpen ? 'var(--bg-secondary)' : 'transparent',
-              borderRadius: 8,
+              background: scratchpadOpen ? 'rgba(196,168,130,0.15)' : 'transparent',
+              border: scratchpadOpen ? '1px solid rgba(196,168,130,0.4)' : '1px solid transparent',
+              borderRadius: 6,
               cursor: 'pointer',
+              padding: '5px 7px',
+              color: scratchpadOpen ? '#C4A882' : 'var(--text-secondary)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              color: scratchpadOpen ? 'var(--text-primary)' : 'var(--text-secondary)',
-              fontSize: 16,
+              transition: 'all 150ms ease',
             }}
           >
-            📓
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2" />
+              <rect x="8" y="2" width="8" height="4" rx="1" ry="1" />
+            </svg>
           </button>
 
           {/* Study button */}
@@ -611,16 +613,16 @@ export default function Reader({
             onClick={openStudyPanel}
             aria-label="Study assistant"
             style={{
-              width: 32,
-              height: 32,
-              border: 'none',
               background: studyPanelOpen ? '#1A1917' : 'transparent',
-              borderRadius: 8,
+              border: studyPanelOpen ? '1px solid #1A1917' : '1px solid transparent',
+              borderRadius: 6,
               cursor: 'pointer',
+              padding: '5px 7px',
+              color: studyPanelOpen ? 'var(--accent-warm)' : 'var(--text-secondary)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              color: studyPanelOpen ? 'var(--accent-warm)' : 'var(--text-secondary)',
+              transition: 'all 150ms ease',
               fontSize: 14,
               fontWeight: 600,
             }}

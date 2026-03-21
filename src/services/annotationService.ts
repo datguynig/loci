@@ -60,7 +60,7 @@ export async function saveAnnotationToSupabase(
       spine_href: annotation.href,
       quote: annotation.quote,
       note: annotation.note,
-      type: annotation.type,
+      type: annotation.type ?? 'note',
       updated_at: new Date().toISOString(),
     },
     { onConflict: 'id' },

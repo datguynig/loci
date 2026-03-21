@@ -37,6 +37,7 @@ function makeAnnotation(overrides: Partial<Annotation> = {}): Annotation {
     href: 'chapter1.xhtml',
     quote: 'Some quoted text',
     note: 'My note',
+    type: 'note',
     createdAt: 1_000_000,
     ...overrides,
   }
@@ -127,6 +128,26 @@ describe('saveAnnotationToSupabase', () => {
     expect(upsertArg.spine_href).toBe('ch3.xhtml')
     expect(upsertArg.quote).toBe('Q')
     expect(upsertArg.note).toBe('N')
+    expect(upsertArg.type).toBe('note')
+  })
+
+  it('maps chapter_note type to upsert payload', async () => {
+    const supabase = makeSupabase()
+    const ann = makeAnnotation({ type: 'chapter_note', quote: '', note: 'Freeform' })
+
+    await saveAnnotationToSupabase(supabase as never, 'u', 'b', ann)
+
+    const upsertArg = (supabase._chain.upsert as ReturnType<typeof vi.fn>).mock.calls[0][0]
+    expect(upsertArg.type).toBe('chapter_note')
+  })
+
+  it('defaults missing type to note in upsert payload', async () => {
+    const supabase = makeSupabase()
+    const ann = { ...makeAnnotation(), type: undefined as unknown as Annotation['type'] }
+
+    await saveAnnotationToSupabase(supabase as never, 'u', 'b', ann)
+
+    const upsertArg = (supabase._chain.upsert as ReturnType<typeof vi.fn>).mock.calls[0][0]
     expect(upsertArg.type).toBe('note')
   })
 
