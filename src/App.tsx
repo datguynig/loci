@@ -10,6 +10,7 @@ import type { FontSize, LayoutMode } from './hooks/useEpub'
 interface OpenBook {
   file: File
   bookId: string | null
+  studyOptions?: { panel?: 'scratchpad'; chapterHref?: string }
 }
 
 function AppContent() {
@@ -30,8 +31,8 @@ function AppContent() {
     document.documentElement.setAttribute('data-theme', prefs.theme)
   }, [prefs.theme])
 
-  const handleOpenBook = useCallback((file: File, bookId?: string) => {
-    setOpenBook({ file, bookId: bookId ?? null })
+  const handleOpenBook = useCallback((file: File, bookId?: string, studyOptions?: { panel?: 'scratchpad'; chapterHref?: string }) => {
+    setOpenBook({ file, bookId: bookId ?? null, studyOptions })
   }, [])
 
   const handleThemeToggle = useCallback(() => {
@@ -59,6 +60,7 @@ function AppContent() {
           onHighlightChange={(v: boolean) => set('highlightEnabled', v)}
           onAutoscrollChange={(v: boolean) => set('autoscrollEnabled', v)}
           onClose={() => setOpenBook(null)}
+          studyOptions={openBook.studyOptions}
         />
       )}
     </AnimatePresence>

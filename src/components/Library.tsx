@@ -10,7 +10,7 @@ import BookDetailModal from './BookDetailModal'
 
 interface LibraryProps {
   supabase: SupabaseClient
-  onOpenBook: (file: File, bookId?: string) => void
+  onOpenBook: (file: File, bookId?: string, studyOptions?: { panel?: 'scratchpad'; chapterHref?: string }) => void
 }
 
 export default function Library({ supabase, onOpenBook }: LibraryProps) {
@@ -43,6 +43,22 @@ export default function Library({ supabase, onOpenBook }: LibraryProps) {
         onOpenBook(file, book.id)
       } catch (err) {
         console.error('Failed to open book', err)
+        setOpeningId(null)
+      }
+    },
+    [supabase, onOpenBook],
+  )
+
+  const handleStudyBook = useCallback(
+    async (book: Book, opts: { panel?: 'scratchpad'; chapterHref?: string }) => {
+      setOpeningId(book.id)
+      setDetailBook(null)
+      try {
+        const file = await getBookFile(supabase, book)
+        await markLastRead(supabase, book.id)
+        onOpenBook(file, book.id, opts)
+      } catch (err) {
+        console.error('Failed to open book for study', err)
         setOpeningId(null)
       }
     },
@@ -266,6 +282,7 @@ export default function Library({ supabase, onOpenBook }: LibraryProps) {
             supabase={supabase}
             onClose={() => setDetailBook(null)}
             onRead={() => handleOpenBook(detailBook)}
+            onStudy={(opts) => handleStudyBook(detailBook, opts)}
             onArchive={handleArchive}
             onUnarchive={handleUnarchive}
             onDelete={handleDelete}
