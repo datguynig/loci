@@ -429,7 +429,7 @@ function ContinueBanner({
             display: 'flex',
             alignItems: 'center',
             gap: 18,
-            padding: '18px 52px 18px 18px',
+            padding: '18px 48px 18px 18px',
             borderRadius: 12,
             border: '1px solid rgba(26,25,23,0.08)',
             background: '#FFFFFF',
@@ -511,24 +511,6 @@ function ContinueBanner({
             )}
           </div>
 
-          {/* Right chevron — signals card is navigable */}
-          <svg
-            width="16" height="16"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke={hovered && !opening ? '#C4A882' : 'rgba(26,25,23,0.2)'}
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            style={{
-              flexShrink: 0,
-              marginRight: 4,
-              transition: 'stroke 200ms ease',
-            }}
-            aria-hidden
-          >
-            <path d="M9 18l6-6-6-6" />
-          </svg>
         </button>
 
         {/* Details button — positioned absolutely so it doesn't affect card layout */}
