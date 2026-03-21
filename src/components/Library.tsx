@@ -429,19 +429,19 @@ function ContinueBanner({
             display: 'flex',
             alignItems: 'center',
             gap: 18,
-            padding: '18px 48px 18px 18px',
-            borderRadius: 12,
-            border: '1px solid rgba(26,25,23,0.08)',
-            background: '#FFFFFF',
-            cursor: opening ? 'default' : 'pointer',
-            textAlign: 'left',
-            font: 'inherit',
-            color: 'inherit',
-            boxShadow: hovered && !opening
-              ? '0 2px 4px rgba(0,0,0,0.04), 0 12px 36px rgba(26,25,23,0.09)'
-              : '0 1px 3px rgba(0,0,0,0.05), 0 4px 16px rgba(26,25,23,0.05)',
-            transform: hovered && !opening ? 'translateY(-1px)' : 'translateY(0)',
-            transition: 'box-shadow 200ms ease, transform 200ms ease',
+          padding: '18px 48px 18px 18px',
+          borderRadius: 12,
+          border: hovered && !opening
+            ? '1px solid rgba(196,168,130,0.45)'
+            : '1px solid rgba(26,25,23,0.08)',
+          background: '#FFFFFF',
+          cursor: opening ? 'default' : 'pointer',
+          textAlign: 'left',
+          font: 'inherit',
+          color: 'inherit',
+          boxShadow: '0 1px 3px rgba(0,0,0,0.05), 0 4px 16px rgba(26,25,23,0.05)',
+          transform: 'none',
+          transition: 'border-color 200ms ease, box-shadow 200ms ease',
           }}
         >
           {/* Cover */}
@@ -608,24 +608,31 @@ function BookCard({
   onDetail: () => void
 }) {
   const [hovered, setHovered] = useState(false)
+  const [pressed, setPressed] = useState(false)
 
   return (
     <div
-      style={{ position: 'relative', cursor: 'pointer' }}
+      style={{ position: 'relative', cursor: opening ? 'default' : 'pointer' }}
       onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
+      onMouseLeave={() => { setHovered(false); setPressed(false) }}
     >
       <div
         onClick={opening ? undefined : onOpen}
+        onMouseDown={() => { if (!opening) setPressed(true) }}
+        onMouseUp={() => setPressed(false)}
         style={{
           aspectRatio: '2/3',
           borderRadius: 7,
           overflow: 'hidden',
           background: '#EAE7E1',
           position: 'relative',
-          boxShadow: hovered ? '0 8px 24px rgba(0,0,0,0.14)' : '0 2px 8px rgba(0,0,0,0.08)',
-          transform: hovered ? 'translateY(-3px) scale(1.015)' : 'none',
-          transition: 'all 200ms ease',
+          boxShadow: hovered
+            ? '0 6px 22px rgba(0,0,0,0.16), 0 1px 4px rgba(0,0,0,0.06)'
+            : '0 2px 8px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.04)',
+          transform: pressed ? 'scale(0.97)' : 'none',
+          transition: pressed
+            ? 'transform 80ms ease, box-shadow 80ms ease'
+            : 'transform 160ms ease, box-shadow 240ms ease',
         }}
       >
         {book.coverUrl ? (
@@ -655,51 +662,62 @@ function BookCard({
           </div>
         )}
 
-        {hovered && (
-          <>
-            <div style={{
-              position: 'absolute',
-              inset: 0,
-              background: 'linear-gradient(to top, rgba(0,0,0,0.65) 0%, transparent 55%)',
-              display: 'flex',
-              alignItems: 'flex-end',
-              padding: '10px 10px',
-              pointerEvents: 'none',
-            }}>
-              <span style={{
-                fontFamily: '"DM Sans", system-ui, sans-serif',
-                fontSize: 11,
-                fontWeight: 600,
-                color: '#FFFFFF',
-                letterSpacing: '0.04em',
-              }}>
-                {opening ? 'Opening…' : book.status === 'archived' ? 'Read' : 'Read'}
-              </span>
-            </div>
-            <button
-              onClick={(e) => { e.stopPropagation(); onDetail() }}
-              aria-label="Book details"
-              style={{
-                position: 'absolute',
-                top: 6,
-                right: 6,
-                background: 'rgba(255,255,255,0.92)',
-                border: 'none',
-                borderRadius: 5,
-                padding: '3px 7px',
-                fontFamily: '"DM Sans", system-ui, sans-serif',
-                fontSize: 13,
-                fontWeight: 700,
-                color: '#8A8680',
-                cursor: 'pointer',
-                lineHeight: 1,
-                letterSpacing: '0.05em',
-              }}
-            >
-              ···
-            </button>
-          </>
-        )}
+        {/* Overlay: always rendered, fades in on hover */}
+        <div style={{
+          position: 'absolute',
+          inset: 0,
+          background: 'linear-gradient(to top, rgba(0,0,0,0.6) 0%, transparent 52%)',
+          display: 'flex',
+          alignItems: 'flex-end',
+          padding: 10,
+          opacity: hovered ? 1 : 0,
+          transition: 'opacity 180ms ease',
+          pointerEvents: 'none',
+        }}>
+          <span style={{
+            fontFamily: '"DM Sans", system-ui, sans-serif',
+            fontSize: 11,
+            fontWeight: 600,
+            color: '#FFFFFF',
+            letterSpacing: '0.06em',
+            textTransform: 'uppercase',
+          }}>
+            {opening ? 'Opening…' : 'Read'}
+          </span>
+        </div>
+
+        {/* Details button: always rendered, fades in on hover */}
+        <button
+          onClick={(e) => { e.stopPropagation(); onDetail() }}
+          aria-label="Book details"
+          style={{
+            position: 'absolute',
+            top: 7,
+            right: 7,
+            width: 28,
+            height: 28,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            background: 'rgba(255,255,255,0.88)',
+            border: 'none',
+            borderRadius: 6,
+            cursor: 'pointer',
+            color: '#1A1917',
+            opacity: hovered ? 1 : 0,
+            pointerEvents: hovered ? 'auto' : 'none',
+            transition: 'opacity 180ms ease, background 120ms ease',
+            backdropFilter: 'blur(4px)',
+          }}
+          onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(255,255,255,1)' }}
+          onMouseLeave={(e) => { e.currentTarget.style.background = 'rgba(255,255,255,0.88)' }}
+        >
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
+            <circle cx="5" cy="12" r="1.8" />
+            <circle cx="12" cy="12" r="1.8" />
+            <circle cx="19" cy="12" r="1.8" />
+          </svg>
+        </button>
       </div>
 
       <div style={{ marginTop: 10 }}>
