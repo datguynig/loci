@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
+import { useAuth } from '@clerk/clerk-react'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import FlashCard from './FlashCard'
 import { sendStudyMessage } from '../services/aiStudyService'
@@ -63,12 +64,12 @@ export default function StudyPanel({
   isOpen,
   onClose,
   context,
-  supabase,
   onFlashcardsGenerated,
   chapterHref,
   reviewMode,
   reviewFlashcards,
 }: StudyPanelProps) {
+  const { getToken } = useAuth()
   const [messages, setMessages] = useState<Message[]>([])
   const [input, setInput] = useState('')
   const [streaming, setStreaming] = useState(false)
@@ -110,7 +111,10 @@ export default function StudyPanel({
     try {
       let fullContent = ''
       const allMessages = [...messages, userMessage]
-      for await (const chunk of sendStudyMessage(supabase, action, allMessages, context)) {
+      for await (const chunk of sendStudyMessage(
+        () => getToken({ template: 'supabase' }),
+        action, allMessages, context,
+      )) {
         fullContent += chunk
         setMessages((prev) => {
           const last = prev[prev.length - 1]

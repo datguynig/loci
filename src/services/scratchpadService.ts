@@ -8,7 +8,7 @@ export async function getScratchpad(
     .from('scratchpad')
     .select('content')
     .eq('book_id', bookId)
-    .single()
+    .maybeSingle()
   if (error || !data) return ''
   return (data.content as string) ?? ''
 }

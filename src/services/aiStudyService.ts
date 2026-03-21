@@ -1,5 +1,3 @@
-import type { SupabaseClient } from '@supabase/supabase-js'
-
 export interface StudyContext {
   chapterText: string
   chapterNotes: string[]
@@ -14,22 +12,31 @@ export interface Message {
   content: string
 }
 
+/**
+ * Streams a study assistant response from the ai-study edge function.
+ *
+ * Accepts a `getToken` callback rather than a Supabase session because this
+ * app uses Clerk for auth — `supabase.auth.getSession()` always returns null.
+ * Falls back to the anon key so the function can be reached even if the Clerk
+ * JWT template is not yet configured.
+ */
 export async function* sendStudyMessage(
-  supabase: SupabaseClient,
+  getToken: () => Promise<string | null>,
   action: string,
   messages: Message[],
   context: StudyContext,
 ): AsyncGenerator<string> {
-  const {
-    data: { session },
-  } = await supabase.auth.getSession()
+  const clerkToken = await getToken().catch(() => null)
+  const authToken = clerkToken ?? (import.meta.env.VITE_SUPABASE_ANON_KEY as string)
 
   const response = await fetch(
-    `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/ai-study`,
+    `${import.meta.env.VITE_SUPABASE_URL as string}/functions/v1/ai-study`,
     {
       method: 'POST',
       headers: {
-        Authorization: 'Bearer ' + session?.access_token,
+        // apikey is always the anon key — Supabase gateway requires it
+        apikey: import.meta.env.VITE_SUPABASE_ANON_KEY as string,
+        Authorization: `Bearer ${authToken}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({ action, messages, context }),
@@ -37,7 +44,8 @@ export async function* sendStudyMessage(
   )
 
   if (!response.ok) {
-    throw new Error(response.statusText)
+    const msg = await response.text().catch(() => response.statusText)
+    throw new Error(msg || response.statusText)
   }
 
   const reader = response.body!.getReader()
