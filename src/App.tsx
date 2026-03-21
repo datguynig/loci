@@ -1,26 +1,21 @@
-import { useState, useCallback, useEffect } from 'react'
+import { useCallback, useEffect } from 'react'
 import { AnimatePresence } from 'framer-motion'
 import Landing from './components/Landing'
 import Reader from './components/Reader'
-import type { FontSize, Theme, LayoutMode } from './hooks/useEpub'
+import { useState } from 'react'
+import { usePreferences } from './hooks/usePreferences'
 
 type View = 'landing' | 'reader'
-
-function getInitialTheme(): Theme {
-  return 'light'
-}
 
 export default function App() {
   const [view, setView] = useState<View>('landing')
   const [epubFile, setEpubFile] = useState<File | null>(null)
-  const [theme, setTheme] = useState<Theme>(getInitialTheme)
-  const [fontSize, setFontSize] = useState<FontSize>('md')
-  const [layoutMode, setLayoutMode] = useState<LayoutMode>('scroll')
+  const { prefs, set } = usePreferences()
 
   // Sync data-theme attribute whenever theme changes (including on mount)
   useEffect(() => {
-    document.documentElement.setAttribute('data-theme', theme)
-  }, [theme])
+    document.documentElement.setAttribute('data-theme', prefs.theme)
+  }, [prefs.theme])
 
   const handleFileSelected = useCallback((file: File) => {
     setEpubFile(file)
@@ -28,8 +23,8 @@ export default function App() {
   }, [])
 
   const handleThemeToggle = useCallback(() => {
-    setTheme((t) => (t === 'light' ? 'dark' : 'light'))
-  }, [])
+    set('theme', prefs.theme === 'light' ? 'dark' : 'light')
+  }, [prefs.theme, set])
 
   return (
     <AnimatePresence mode="wait">
@@ -39,12 +34,16 @@ export default function App() {
         <Reader
           key="reader"
           file={epubFile!}
-          theme={theme}
-          fontSize={fontSize}
-          layoutMode={layoutMode}
+          theme={prefs.theme}
+          fontSize={prefs.fontSize}
+          layoutMode={prefs.layoutMode}
+          highlightEnabled={prefs.highlightEnabled}
+          autoscrollEnabled={prefs.autoscrollEnabled}
           onThemeToggle={handleThemeToggle}
-          onFontSizeChange={setFontSize}
-          onLayoutModeChange={setLayoutMode}
+          onFontSizeChange={(s) => set('fontSize', s)}
+          onLayoutModeChange={(m) => set('layoutMode', m)}
+          onHighlightChange={(v) => set('highlightEnabled', v)}
+          onAutoscrollChange={(v) => set('autoscrollEnabled', v)}
         />
       )}
     </AnimatePresence>

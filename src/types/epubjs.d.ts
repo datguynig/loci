@@ -48,7 +48,7 @@ declare module 'epubjs' {
   }
 
   export interface Rendition {
-    display(target?: string): Promise<void>
+    display(target?: string | number): Promise<void>
     next(): Promise<void>
     prev(): Promise<void>
     themes: ThemesManager
@@ -75,14 +75,18 @@ declare module 'epubjs' {
     language?: string
   }
 
-  export interface Spine {
-    spineItems: SpineItem[]
-  }
-
-  export interface SpineItem {
+  export interface SpineSection {
     href: string
     index: number
     linear: string
+    next?: () => SpineSection | undefined
+    prev?: () => SpineSection | undefined
+  }
+
+  export interface Spine {
+    spineItems: SpineSection[]
+    /** No argument: first linear spine section (epub.js convention). */
+    get(target?: string | number): SpineSection | null
   }
 
   export interface Book {

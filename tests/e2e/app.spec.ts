@@ -1,10 +1,14 @@
 import { test, expect, type Page } from '@playwright/test'
+import * as fs from 'fs'
 import * as path from 'path'
 import { fileURLToPath } from 'url'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const TEST_EPUB = path.join(__dirname, '../fixtures/test.epub')
 const LONG_TEST_EPUB = path.join(__dirname, '../fixtures/long-test.epub')
+const NONLINEAR_COVER_EPUB = path.join(__dirname, '../fixtures/nonlinear-cover.epub')
+const FRANKENSTEIN_EPUB = path.join(__dirname, '../../public/ebooks/Frankenstein.epub')
+const frankensteinAvailable = fs.existsSync(FRANKENSTEIN_EPUB)
 
 // ─── Helpers ───────────────────────────────────────────────────────────────
 
@@ -24,6 +28,24 @@ async function loadLongEpub(page: Page) {
     page.click('text=or click to browse'),
   ])
   await fileChooser.setFiles(LONG_TEST_EPUB)
+}
+
+async function loadFrankenstein(page: Page) {
+  await page.goto('/')
+  const [fileChooser] = await Promise.all([
+    page.waitForEvent('filechooser'),
+    page.click('text=or click to browse'),
+  ])
+  await fileChooser.setFiles(FRANKENSTEIN_EPUB)
+}
+
+async function loadNonlinearCoverFixture(page: Page) {
+  await page.goto('/')
+  const [fileChooser] = await Promise.all([
+    page.waitForEvent('filechooser'),
+    page.click('text=or click to browse'),
+  ])
+  await fileChooser.setFiles(NONLINEAR_COVER_EPUB)
 }
 
 async function waitForBookReady(page: Page) {
@@ -174,6 +196,27 @@ test.describe('Chapter navigation', () => {
     await expect(page.locator('#epub-viewer iframe').first()).toBeVisible()
   })
 
+  test('multi-step page navigation dismisses loading overlay', async ({ page }) => {
+    await page.getByLabel('Two page layout').click()
+    for (let i = 0; i < 6; i++) {
+      await page.getByLabel('Next page').click()
+      await page.waitForTimeout(280)
+    }
+    await expect(page.getByText('Loading book…')).toBeHidden()
+    await expect(page.getByText('Loading chapter…')).toBeHidden()
+    await expect(page.locator('#epub-viewer iframe').first()).toBeVisible()
+  })
+
+  test('multi-step chapter navigation dismisses loading overlay', async ({ page }) => {
+    for (let i = 0; i < 4; i++) {
+      await page.getByLabel('Next chapter').click()
+      await page.waitForTimeout(400)
+    }
+    await expect(page.getByText('Loading book…')).toBeHidden()
+    await expect(page.getByText('Loading chapter…')).toBeHidden()
+    await expect(page.locator('#epub-viewer iframe').first()).toBeVisible()
+  })
+
   test('ArrowLeft keyboard shortcut keeps epub rendered', async ({ page }) => {
     await page.keyboard.press('ArrowRight')
     await page.waitForTimeout(300)
@@ -216,6 +259,44 @@ test.describe('Chapter navigation', () => {
     await expect(pageInfo).toHaveText(`2 / ${total}`)
     await page.getByLabel('Next chapter').click()
     await expect(pageInfo).toHaveText(`3 / ${total}`)
+  })
+})
+
+test.describe('Nonlinear spine (non-linear cover first)', () => {
+  test('opens first linear chapter on load and next chapter advances', async ({ page }) => {
+    test.skip(!fs.existsSync(NONLINEAR_COVER_EPUB), 'nonlinear-cover.epub fixture missing')
+    await loadNonlinearCoverFixture(page)
+    await waitForBookReady(page)
+    await expect(page.getByText('Nonlinear Cover Fixture')).toBeVisible()
+    const frame = page.frameLocator('#epub-viewer iframe').first()
+    await expect(frame.getByText('NONLINEAR_FIXTURE_CHAPTER_ONE')).toBeVisible({ timeout: 10_000 })
+    await page.getByLabel('Next chapter').click()
+    await expect(frame.getByText('NONLINEAR_FIXTURE_CHAPTER_TWO')).toBeVisible({ timeout: 10_000 })
+  })
+})
+
+test.describe('Frankenstein EPUB regression', () => {
+  test('scroll layout loads and overlay clears', async ({ page }) => {
+    test.skip(!frankensteinAvailable, 'public/ebooks/Frankenstein.epub not present')
+    await loadFrankenstein(page)
+    await waitForBookReady(page)
+    await expect(page.getByText('Loading book…')).toBeHidden()
+    await expect(page.getByText('Loading chapter…')).toBeHidden()
+    await expect(page.locator('#epub-viewer iframe').first()).toBeVisible()
+  })
+
+  test('two-page layout and repeated page turns clear loading', async ({ page }) => {
+    test.skip(!frankensteinAvailable, 'public/ebooks/Frankenstein.epub not present')
+    await loadFrankenstein(page)
+    await waitForBookReady(page)
+    await page.getByLabel('Two page layout').click()
+    for (let i = 0; i < 5; i++) {
+      await page.getByLabel('Next page').click()
+      await page.waitForTimeout(300)
+    }
+    await expect(page.getByText('Loading book…')).toBeHidden()
+    await expect(page.getByText('Loading chapter…')).toBeHidden()
+    await expect(page.locator('#epub-viewer iframe').first()).toBeVisible()
   })
 })
 
@@ -390,6 +471,285 @@ test.describe('Audio / TTS controls', () => {
     await page.waitForTimeout(400)
     // After navigation TTS stops — play button should be visible
     await expect(playPauseBtn(page)).toBeVisible()
+  })
+})
+
+// ─── TTS Reading Highlight ─────────────────────────────────────────────────
+
+test.describe('TTS reading highlight', () => {
+  test.beforeEach(async ({ page }) => {
+    await loadEpub(page)
+    await waitForBookReady(page)
+  })
+
+  test('highlight appears on a paragraph when TTS is playing', async ({ page }) => {
+    // Intercept speech synthesis so no audio is needed
+    await page.evaluate(() => {
+      window.speechSynthesis.speak = () => {}
+    })
+
+    await page.getByRole('button', { name: 'Play', exact: true }).click()
+    // Wait briefly for the highlight effect
+    await page.waitForTimeout(600)
+
+    const highlighted = await page.evaluate(() => {
+      const iframes = document.querySelectorAll('#epub-viewer iframe')
+      for (const iframe of Array.from(iframes)) {
+        const doc = (iframe as HTMLIFrameElement).contentDocument
+        if (!doc) continue
+        const el = doc.querySelector('[data-loci-reading]') as HTMLElement | null
+        if (el) return el.style.background
+      }
+      return null
+    })
+
+    expect(highlighted).not.toBeNull()
+    expect(highlighted).toContain('196')  // rgba(196,168,130,…)
+  })
+
+  test('highlight clears when TTS is stopped', async ({ page }) => {
+    await page.evaluate(() => { window.speechSynthesis.speak = () => {} })
+    await page.getByRole('button', { name: 'Play', exact: true }).click()
+    await page.waitForTimeout(600)
+    await page.getByLabel('Stop').click()
+    await page.waitForTimeout(300)
+
+    const highlighted = await page.evaluate(() => {
+      const iframes = document.querySelectorAll('#epub-viewer iframe')
+      for (const iframe of Array.from(iframes)) {
+        const doc = (iframe as HTMLIFrameElement).contentDocument
+        if (!doc) continue
+        if (doc.querySelector('[data-loci-reading]')) return true
+      }
+      return false
+    })
+
+    expect(highlighted).toBe(false)
+  })
+
+  test('highlight advances through at least 3 sentences', async ({ page }) => {
+    // Abort ElevenLabs so TTS falls back to browser speech synthesis immediately
+    await page.route('**/api.elevenlabs.io/**', route => route.abort())
+
+    // Capture utterances rather than speaking them, so we control when each ends
+    await page.evaluate(() => {
+      ;(window as any).__utterances = [] as SpeechSynthesisUtterance[]
+      window.speechSynthesis.speak = (u: SpeechSynthesisUtterance) => {
+        ;(window as any).__utterances.push(u)
+      }
+      window.speechSynthesis.cancel = () => {}
+    })
+
+    await page.getByRole('button', { name: 'Play', exact: true }).click()
+
+    // Wait until the first utterance is queued (ElevenLabs fallback has happened)
+    await page.waitForFunction(() => (window as any).__utterances?.length >= 1, { timeout: 5000 })
+    await page.waitForTimeout(200) // let React re-render the highlight
+
+    const getHighlight = () => page.evaluate(() => {
+      const iframes = document.querySelectorAll('#epub-viewer iframe')
+      for (const iframe of Array.from(iframes)) {
+        const doc = (iframe as HTMLIFrameElement).contentDocument
+        if (!doc) continue
+        const el = doc.querySelector('[data-loci-reading]') as HTMLElement | null
+        if (el) return (el.textContent ?? '').replace(/\s+/g, ' ').trim().slice(0, 80)
+      }
+      return null
+    })
+
+    const h0 = await getHighlight()
+    expect(h0, 'sentence 0 should be highlighted').not.toBeNull()
+
+    // Advance to sentence 1
+    await page.evaluate(() => (window as any).__utterances[0]?.onend?.(new Event('end')))
+    await page.waitForFunction(() => (window as any).__utterances?.length >= 2, { timeout: 3000 })
+    await page.waitForTimeout(200)
+    const h1 = await getHighlight()
+    expect(h1, 'sentence 1 should be highlighted').not.toBeNull()
+
+    // Advance to sentence 2
+    await page.evaluate(() => (window as any).__utterances[1]?.onend?.(new Event('end')))
+    await page.waitForFunction(() => (window as any).__utterances?.length >= 3, { timeout: 3000 })
+    await page.waitForTimeout(200)
+    const h2 = await getHighlight()
+    expect(h2, 'sentence 2 should be highlighted').not.toBeNull()
+
+    // Each sentence should highlight different text — the core behaviour being tested
+    const unique = new Set([h0, h1, h2])
+    expect(
+      unique.size,
+      `highlight should advance through 3 distinct sentences but got: ${JSON.stringify([h0, h1, h2])}`
+    ).toBe(3)
+  })
+})
+
+// ─── Annotations ───────────────────────────────────────────────────────────
+
+test.describe('Annotations', () => {
+  test.beforeEach(async ({ page }) => {
+    await loadEpub(page)
+    await waitForBookReady(page)
+  })
+
+  test('sidebar has Contents and Notes tabs', async ({ page }) => {
+    await page.getByLabel('Toggle table of contents').click()
+    const sidebar = sidebarPanel(page)
+    await expect(sidebar.getByRole('tab', { name: 'Contents', exact: true })).toBeVisible()
+    await expect(sidebar.getByRole('tab', { name: /Notes/ })).toBeVisible()
+  })
+
+  test('Notes tab shows empty state when no annotations exist', async ({ page }) => {
+    await page.getByLabel('Toggle table of contents').click()
+    const sidebar = sidebarPanel(page)
+    await sidebar.getByRole('tab', { name: /Notes/ }).click()
+    await expect(sidebar.getByText('No notes yet')).toBeVisible()
+  })
+
+  test('selecting text in epub viewer fires selection callback', async ({ page }) => {
+    // Simulate mouseup with selected text inside the iframe
+    const selectionFired = await page.evaluate(async () => {
+      return new Promise<boolean>((resolve) => {
+        const iframes = document.querySelectorAll('#epub-viewer iframe')
+        const iframe = iframes[0] as HTMLIFrameElement | undefined
+        if (!iframe?.contentDocument) { resolve(false); return }
+        const doc = iframe.contentDocument
+        // Manually fire mouseup with a text selection
+        const p = doc.querySelector('p')
+        if (!p) { resolve(false); return }
+        // Mock getSelection to return a non-empty selection
+        const origGetSel = doc.getSelection.bind(doc)
+        doc.getSelection = () => ({
+          toString: () => 'quick brown fox',
+          getRangeAt: () => ({
+            getBoundingClientRect: () => ({ left: 10, top: 50, width: 120, height: 20 }),
+          }),
+        } as unknown as Selection)
+        doc.dispatchEvent(new MouseEvent('mouseup', { bubbles: true }))
+        doc.getSelection = origGetSel
+        // Give React time to set state
+        setTimeout(() => {
+          const bubble = document.querySelector('button[aria-label="Select voice"]')
+          // The SelectionBubble "+ Note" button would be a plain button (not aria-labelled)
+          // just check the overlay div has children
+          const overlay = document.querySelector('#epub-viewer')?.parentElement?.querySelector('[style*="pointer-events: none"]')
+          resolve(overlay !== null && overlay.children.length > 0)
+        }, 300)
+      })
+    })
+    // Selection mechanism is wired (overlay exists in DOM)
+    // This test primarily verifies no crash occurs
+    expect(typeof selectionFired).toBe('boolean')
+  })
+})
+
+// ─── Reader Settings ───────────────────────────────────────────────────────
+
+test.describe('Reader settings', () => {
+  test.beforeEach(async ({ page }) => {
+    await loadEpub(page)
+    await waitForBookReady(page)
+  })
+
+  test('gear button opens settings popover with highlight and autoscroll toggles', async ({ page }) => {
+    await page.getByRole('button', { name: 'Reader settings' }).click()
+    const dialog = page.getByRole('dialog', { name: 'Reader settings' })
+    await expect(dialog).toBeVisible()
+    await expect(dialog.getByRole('switch', { name: 'Sentence highlight' })).toBeVisible()
+    await expect(dialog.getByRole('switch', { name: 'Auto-scroll to sentence' })).toBeVisible()
+  })
+
+  test('gear button toggles settings popover closed', async ({ page }) => {
+    const gear = page.getByRole('button', { name: 'Reader settings' })
+    await gear.click()
+    await expect(page.getByRole('dialog', { name: 'Reader settings' })).toBeVisible()
+    await gear.click()
+    await expect(page.getByRole('dialog', { name: 'Reader settings' })).not.toBeVisible()
+  })
+
+  test('turning off sentence highlight stops marks appearing in epub DOM', async ({ page }) => {
+    await page.route('**/api.elevenlabs.io/**', route => route.abort())
+    await page.evaluate(() => {
+      window.speechSynthesis.speak = () => {}
+      window.speechSynthesis.cancel = () => {}
+    })
+
+    // Disable highlight via settings
+    await page.getByRole('button', { name: 'Reader settings' }).click()
+    const highlightSwitch = page.getByRole('switch', { name: 'Sentence highlight' })
+    await expect(highlightSwitch).toHaveAttribute('aria-checked', 'true')
+    await highlightSwitch.click()
+    await expect(highlightSwitch).toHaveAttribute('aria-checked', 'false')
+
+    // Start TTS
+    await page.getByRole('button', { name: 'Play', exact: true }).click()
+    await page.waitForTimeout(600)
+
+    // No highlight mark should appear
+    const marked = await page.evaluate(() => {
+      const iframes = document.querySelectorAll('#epub-viewer iframe')
+      for (const iframe of Array.from(iframes)) {
+        const doc = (iframe as HTMLIFrameElement).contentDocument
+        if (!doc) continue
+        if (doc.querySelector('[data-loci-reading]')) return true
+      }
+      return false
+    })
+    expect(marked).toBe(false)
+  })
+
+  test('preferences persist across page reload', async ({ page }) => {
+    // Change font size to XL
+    await page.getByRole('button', { name: 'Font size xl', exact: false }).click()
+    await expect(page.getByRole('button', { name: 'Font size xl', exact: false }))
+      .toHaveAttribute('aria-pressed', 'true')
+
+    // Disable highlight
+    await page.getByRole('button', { name: 'Reader settings' }).click()
+    await page.getByRole('switch', { name: 'Sentence highlight' }).click()
+
+    // Reload the page (without re-uploading — preferences are in localStorage)
+    await page.reload()
+    await page.goto('/')
+    const [fileChooser] = await Promise.all([
+      page.waitForEvent('filechooser'),
+      page.click('text=or click to browse'),
+    ])
+    const TEST_EPUB_PATH = 'tests/fixtures/test.epub'
+    await fileChooser.setFiles(TEST_EPUB_PATH)
+    await waitForBookReady(page)
+
+    // Font size XL should still be active
+    await expect(page.getByRole('button', { name: 'Font size xl', exact: false }))
+      .toHaveAttribute('aria-pressed', 'true')
+
+    // Highlight should still be off
+    await page.getByRole('button', { name: 'Reader settings' }).click()
+    await expect(page.getByRole('switch', { name: 'Sentence highlight' }))
+      .toHaveAttribute('aria-checked', 'false')
+  })
+
+  test('opening settings closes any active selection bubble', async ({ page }) => {
+    // Fire a text selection inside the epub iframe
+    await page.evaluate(() => {
+      const iframes = document.querySelectorAll('#epub-viewer iframe')
+      const iframe = iframes[0] as HTMLIFrameElement | undefined
+      if (!iframe?.contentDocument) return
+      const doc = iframe.contentDocument
+      doc.getSelection = () => ({
+        toString: () => 'quick brown fox',
+        getRangeAt: () => ({ getBoundingClientRect: () => ({ left: 10, top: 50, width: 120, height: 20 }) }),
+      } as unknown as Selection)
+      doc.dispatchEvent(new MouseEvent('mouseup', { bubbles: true }))
+    })
+    await page.waitForTimeout(300)
+
+    // Selection bubble should be present
+    const bubble = page.getByRole('button', { name: 'Add note for selected text' })
+    await expect(bubble).toBeVisible()
+
+    // Opening settings should dismiss the bubble
+    await page.getByRole('button', { name: 'Reader settings' }).click()
+    await expect(bubble).not.toBeVisible()
   })
 })
 

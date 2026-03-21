@@ -1,9 +1,12 @@
+import { useRef } from 'react'
 import { motion } from 'framer-motion'
 import type { TTSProvider, ElevenLabsModel } from '../services/ttsService'
 import type { ElevenLabsVoice } from '../services/ttsService'
-import { hasElevenLabsProxy } from '../utils/tts'
+import { hasElevenLabs } from '../utils/tts'
+import VoicePicker from './VoicePicker'
+import ReaderSettings from './ReaderSettings'
 
-const HAS_ELEVENLABS = hasElevenLabsProxy()
+const HAS_ELEVENLABS = hasElevenLabs()
 
 interface AudioBarProps {
   isPlaying: boolean
@@ -30,6 +33,13 @@ interface AudioBarProps {
   onStop: () => void
   onSkipForward: () => void
   onSkipBack: () => void
+  // Settings
+  highlightEnabled: boolean
+  onHighlightChange: (v: boolean) => void
+  autoscrollEnabled: boolean
+  onAutoscrollChange: (v: boolean) => void
+  settingsOpen: boolean
+  onSettingsToggle: () => void
 }
 
 const SPEED_OPTIONS = [0.5, 0.75, 1, 1.25, 1.5, 1.75, 2]
@@ -142,7 +152,14 @@ export default function AudioBar({
   onStop,
   onSkipForward,
   onSkipBack,
+  highlightEnabled,
+  onHighlightChange,
+  autoscrollEnabled,
+  onAutoscrollChange,
+  settingsOpen,
+  onSettingsToggle,
 }: AudioBarProps) {
+  const gearRef = useRef<HTMLButtonElement>(null)
   const currentSentence = sentences[currentSentenceIndex] ?? ''
 
   const handlePlayPause = () => {
@@ -176,31 +193,31 @@ export default function AudioBar({
         flexShrink: 0,
       }}
     >
-      {/* Current sentence preview */}
-      {currentSentence && isPlaying && (
-        <div
+      {/* Current sentence preview — fixed height to prevent epub viewer from resizing on play */}
+      <div
+        style={{
+          height: 24,
+          padding: '4px 16px 0',
+          fontFamily: 'var(--font-reading)',
+          fontStyle: 'italic',
+          fontSize: 12,
+          color: 'var(--text-secondary)',
+          overflow: 'hidden',
+          textOverflow: 'ellipsis',
+          whiteSpace: 'nowrap',
+          opacity: currentSentence && isPlaying ? 1 : 0,
+        }}
+      >
+        <span
           style={{
-            padding: '6px 16px 0',
-            fontFamily: 'var(--font-reading)',
-            fontStyle: 'italic',
-            fontSize: 12,
-            color: 'var(--text-secondary)',
-            overflow: 'hidden',
-            textOverflow: 'ellipsis',
-            whiteSpace: 'nowrap',
+            background: 'rgba(196,168,130,0.25)',
+            padding: '1px 4px',
+            borderRadius: 3,
           }}
         >
-          <span
-            style={{
-              background: 'rgba(196,168,130,0.25)',
-              padding: '1px 4px',
-              borderRadius: 3,
-            }}
-          >
-            {currentSentence}
-          </span>
-        </div>
-      )}
+          {currentSentence}
+        </span>
+      </div>
 
       {/* Controls row */}
       <div
@@ -243,7 +260,16 @@ export default function AudioBar({
         </div>
 
         {/* Right: voice/speed controls */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+        <div style={{ position: 'relative', display: 'flex', alignItems: 'center', gap: 8 }}>
+          <ReaderSettings
+            isOpen={settingsOpen}
+            onClose={onSettingsToggle}
+            highlightEnabled={highlightEnabled}
+            onHighlightChange={onHighlightChange}
+            autoscrollEnabled={autoscrollEnabled}
+            onAutoscrollChange={onAutoscrollChange}
+            anchorRef={gearRef}
+          />
           {/* Waveform (ElevenLabs only) */}
           {provider === 'elevenlabs' && isPlaying && !isPaused && <Waveform />}
 
@@ -298,18 +324,11 @@ export default function AudioBar({
 
           {/* Voice selector */}
           {HAS_ELEVENLABS && provider === 'elevenlabs' && elevenLabsVoices.length > 0 ? (
-            <select
-              value={selectedVoiceId}
-              onChange={(e) => setVoiceId(e.target.value)}
-              aria-label="Select voice"
-              style={{ ...selectStyle, maxWidth: 120 }}
-            >
-              {elevenLabsVoices.map((v) => (
-                <option key={v.voice_id} value={v.voice_id}>
-                  {v.name}
-                </option>
-              ))}
-            </select>
+            <VoicePicker
+              voices={elevenLabsVoices}
+              selectedVoiceId={selectedVoiceId}
+              onSelect={setVoiceId}
+            />
           ) : provider === 'browser' && browserVoices.length > 0 ? (
             <select
               value={selectedBrowserVoice?.name ?? ''}
@@ -339,6 +358,45 @@ export default function AudioBar({
               </span>
             )
           )}
+
+          {/* Settings gear button */}
+          <button
+            ref={gearRef}
+            onClick={onSettingsToggle}
+            aria-label="Reader settings"
+            aria-expanded={settingsOpen}
+            style={{
+              width: 26,
+              height: 26,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              borderRadius: '50%',
+              border: 'none',
+              background: settingsOpen ? 'var(--bg-secondary)' : 'transparent',
+              color: settingsOpen ? 'var(--text-primary)' : 'var(--text-tertiary)',
+              cursor: 'pointer',
+              transition: 'all 120ms ease',
+              flexShrink: 0,
+            }}
+            onMouseEnter={(e) => {
+              if (!settingsOpen) {
+                e.currentTarget.style.color = 'var(--text-primary)'
+                e.currentTarget.style.background = 'var(--bg-secondary)'
+              }
+            }}
+            onMouseLeave={(e) => {
+              if (!settingsOpen) {
+                e.currentTarget.style.color = 'var(--text-tertiary)'
+                e.currentTarget.style.background = 'transparent'
+              }
+            }}
+          >
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="12" cy="12" r="3" />
+              <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
+            </svg>
+          </button>
         </div>
       </div>
     </motion.div>

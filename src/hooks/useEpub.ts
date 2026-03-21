@@ -1,8 +1,9 @@
 import { useState, useRef, useCallback, useEffect } from 'react'
 import ePub from 'epubjs'
-import type { Book, Rendition, NavItem, EpubLocation } from 'epubjs'
+import type { Book, Rendition, NavItem, EpubLocation, SpineSection } from 'epubjs'
 import { calculateProgressPercent } from '../utils/epub'
 import { sanitizeEpubBuffer } from '../utils/epubSanitizer'
+import type { Annotation } from '../services/annotationService'
 
 interface EpubLocations {
   generate: (chars: number) => Promise<void>
@@ -19,6 +20,8 @@ interface UseEpubOptions {
   fontSize: FontSize
   theme: Theme
   layoutMode: LayoutMode
+  highlightEnabled?: boolean
+  autoscrollEnabled?: boolean
 }
 
 export interface UseEpubReturn {
@@ -43,6 +46,10 @@ export interface UseEpubReturn {
   prevChapter: () => void
   goToHref: (href: string) => void
   getCurrentText: () => string
+  highlightSentence: (text: string) => void
+  clearSentenceHighlight: () => void
+  setOnTextSelected: (cb: ((quote: string, href: string, pos: { x: number; y: number }) => void) | null) => void
+  applyAnnotationHighlights: (annotations: Annotation[]) => void
   isLoading: boolean
   hasRenderedContent: boolean
   error: string | null
@@ -86,6 +93,8 @@ function getThemeStyles(
       margin: isPaginated ? '0' : '0 auto',
       width: 'auto',
       'box-sizing': 'border-box',
+      'user-select': 'text',
+      '-webkit-user-select': 'text',
     },
     p: {
       'margin-bottom': '1.2em',
@@ -180,13 +189,26 @@ function getSpinePosition(currentIndex: number, spineItems: { href: string }[]):
   }
 }
 
+function nextLinearSpineItem(items: SpineSection[], fromIndex: number): SpineSection | null {
+  for (let i = fromIndex + 1; i < items.length; i++) {
+    if (items[i].linear) return items[i]
+  }
+  return null
+}
+
+function prevLinearSpineItem(items: SpineSection[], fromIndex: number): SpineSection | null {
+  for (let i = fromIndex - 1; i >= 0; i--) {
+    if (items[i].linear) return items[i]
+  }
+  return null
+}
+
 function buildRenditionOptions(layoutMode: LayoutMode) {
   if (layoutMode === 'scroll') {
     return {
       flow: 'scrolled-doc' as const,
       spread: 'none' as const,
       minSpreadWidth: 9999,
-      fullsize: true,
     }
   }
 
@@ -198,7 +220,8 @@ function buildRenditionOptions(layoutMode: LayoutMode) {
   }
 }
 
-export function useEpub({ fontSize, theme, layoutMode }: UseEpubOptions): UseEpubReturn {
+
+export function useEpub({ fontSize, theme, layoutMode, highlightEnabled = true, autoscrollEnabled = true }: UseEpubOptions): UseEpubReturn {
   const [book, setBook] = useState<Book | null>(null)
   const [rendition, setRendition] = useState<Rendition | null>(null)
   const [toc, setToc] = useState<NavItem[]>([])
@@ -226,6 +249,8 @@ export function useEpub({ fontSize, theme, layoutMode }: UseEpubOptions): UseEpu
   const currentPageRef = useRef(0)
   const totalPagesRef = useRef(0)
   const currentSpineIndexRef = useRef(0)
+  /** Mirrors last relocated href so chapter nav works before/without a stale spine index (e.g. non-linear cover). */
+  const currentDisplayHrefRef = useRef('')
   const isFixedLayoutRef = useRef(false)
   const activeLoadIdRef = useRef(0)
   const layoutModeRef = useRef(layoutMode)
@@ -233,6 +258,8 @@ export function useEpub({ fontSize, theme, layoutMode }: UseEpubOptions): UseEpu
 
   const themeRef = useRef(theme)
   const fontSizeRef = useRef(fontSize)
+  const onTextSelectedRef = useRef<((quote: string, href: string, pos: { x: number; y: number }) => void) | null>(null)
+  const selectionAbortRef = useRef<AbortController | null>(null)
 
   useEffect(() => {
     themeRef.current = theme
@@ -268,6 +295,14 @@ export function useEpub({ fontSize, theme, layoutMode }: UseEpubOptions): UseEpu
     const viewer = viewerRef.current
     if (!viewer) return null
 
+    // In scrolled-doc mode each spine section is its own auto-height iframe
+    // stacked inside .epub-container. The book scrolls on the container, not
+    // inside any individual iframe.
+    if (layoutModeRef.current === 'scroll') {
+      const container = viewer.querySelector('.epub-container') as HTMLElement | null
+      return container ?? viewer
+    }
+
     const iframe = viewer.querySelector('iframe') as HTMLIFrameElement | null
     const iframeScroller = iframe?.contentDocument?.scrollingElement as HTMLElement | null
     if (iframeScroller) return iframeScroller
@@ -280,11 +315,7 @@ export function useEpub({ fontSize, theme, layoutMode }: UseEpubOptions): UseEpu
 
   useEffect(() => {
     if (!renditionRef.current) return
-
     applyTheme(renditionRef.current, theme, fontSize)
-    if (viewerRef.current) {
-      renditionRef.current.resize(viewerRef.current.clientWidth, viewerRef.current.clientHeight)
-    }
   }, [theme, fontSize, applyTheme])
 
   useEffect(() => {
@@ -314,6 +345,7 @@ export function useEpub({ fontSize, theme, layoutMode }: UseEpubOptions): UseEpu
   const resetBookState = useCallback(() => {
     locationsReadyRef.current = false
     currentCfiRef.current = ''
+    currentDisplayHrefRef.current = ''
     currentPageRef.current = 0
     totalPagesRef.current = 0
     tocRef.current = []
@@ -336,7 +368,10 @@ export function useEpub({ fontSize, theme, layoutMode }: UseEpubOptions): UseEpu
 
   const waitForViewer = useCallback((): Promise<HTMLDivElement> => {
     return new Promise((resolve, reject) => {
-      const isReady = () => viewerRef.current && viewerRef.current.clientWidth > 0
+      const isReady = () =>
+        Boolean(
+          viewerRef.current && viewerRef.current.clientWidth > 0 && viewerRef.current.clientHeight > 0,
+        )
       if (isReady()) {
         resolve(viewerRef.current!)
         return
@@ -566,28 +601,83 @@ export function useEpub({ fontSize, theme, layoutMode }: UseEpubOptions): UseEpu
     return true
   }, [])
 
+  const hasRenditionDocument = useCallback((): boolean => {
+    const contents = renditionRef.current?.getContents() ?? []
+    return contents.some((content) => Boolean(content.document?.body))
+  }, [])
+
   const hasRenderableContent = useCallback(() => {
     const contents = renditionRef.current?.getContents() ?? []
     return contents.some((content) => {
       const document = content.document
       if (!document?.body) return false
+      const body = document.body
 
       const fixedLayoutImage = document.querySelector('#fxlChapter img') as HTMLImageElement | null
       if (fixedLayoutImage) {
-        return fixedLayoutImage.complete && fixedLayoutImage.naturalWidth > 0
+        if (fixedLayoutImage.complete && fixedLayoutImage.naturalWidth > 0) return true
+        if (fixedLayoutImage.getAttribute('src') || fixedLayoutImage.src) return true
       }
+
+      if (document.querySelector('svg')) return true
+
+      const compactHtml = body.innerHTML.replace(/\s+/g, '')
+      if (compactHtml.length > 0) return true
 
       const visibleMedia = Array.from(document.images).some(
         (image) => image.complete && image.naturalWidth > 0,
       )
       if (visibleMedia) return true
 
-      const text = document.body.textContent?.replace(/\s+/g, ' ').trim() ?? ''
+      const text = body.textContent?.replace(/\s+/g, ' ').trim() ?? ''
       if (text.length > 0) return true
 
-      return document.body.children.length > 0
+      return body.children.length > 0
     })
   }, [])
+
+  const waitForPendingImagesInRendition = useCallback(async (capMs: number) => {
+    const contents = renditionRef.current?.getContents() ?? []
+    await Promise.all(
+      contents.map(
+        (content) =>
+          new Promise<void>((resolve) => {
+            const doc = content.document
+            if (!doc) {
+              resolve()
+              return
+            }
+            const imgs = Array.from(doc.images).filter((img) => !img.complete)
+            if (imgs.length === 0) {
+              resolve()
+              return
+            }
+            const t = window.setTimeout(resolve, capMs)
+            let pending = imgs.length
+            const done = () => {
+              pending -= 1
+              if (pending <= 0) {
+                window.clearTimeout(t)
+                resolve()
+              }
+            }
+            for (const img of imgs) {
+              img.addEventListener('load', done, { once: true })
+              img.addEventListener('error', done, { once: true })
+            }
+          }),
+      ),
+    )
+  }, [])
+
+  const recoverFromFailedNavigation = useCallback(() => {
+    const hasDoc = hasRenditionDocument()
+    setIsLoading(false)
+    setHasRenderedContent(hasDoc)
+    if (!hasDoc) {
+      setError('Could not open that section.')
+    }
+  }, [hasRenditionDocument])
 
   const syncCurrentLayoutMode = useCallback((currentBook: Book | null = bookRef.current) => {
     const contents = renditionRef.current?.getContents() ?? []
@@ -596,7 +686,19 @@ export function useEpub({ fontSize, theme, layoutMode }: UseEpubOptions): UseEpu
       if (!document) return false
       const isFixedLayout = normalizeFixedLayoutDocument(document)
       if (!isFixedLayout) {
-        normalizeTemplateDocument(document)
+        const isKTemplate = normalizeTemplateDocument(document)
+        // In scroll mode, epub.js sets body inline styles (width, margin, padding)
+        // that override our theme. Injecting a stylesheet with !important beats
+        // inline styles (non-!important), centering the constrained body.
+        if (!isKTemplate && layoutModeRef.current === 'scroll') {
+          let centreStyle = document.getElementById('loci-scroll-centre') as HTMLStyleElement | null
+          if (!centreStyle) {
+            centreStyle = document.createElement('style')
+            centreStyle.id = 'loci-scroll-centre'
+            document.head.appendChild(centreStyle)
+          }
+          centreStyle.textContent = 'body { width: auto !important; margin-left: auto !important; margin-right: auto !important; }'
+        }
       }
       return isFixedLayout
     })
@@ -617,22 +719,41 @@ export function useEpub({ fontSize, theme, layoutMode }: UseEpubOptions): UseEpu
     }
   }, [normalizeFixedLayoutDocument, normalizeTemplateDocument])
 
-  const waitForRenderableContent = useCallback(async (renderId: number, attempts = 24, delayMs = 100) => {
-    for (let attempt = 0; attempt < attempts; attempt += 1) {
-      if (renderId !== activeRenderIdRef.current) return false
+  const waitForRenderableContent = useCallback(
+    async (renderId: number, attempts = 24, delayMs = 100) => {
+      for (let attempt = 0; attempt < attempts; attempt += 1) {
+        if (renderId !== activeRenderIdRef.current) return false
 
+        syncCurrentLayoutMode(bookRef.current)
+        await waitForPendingImagesInRendition(500)
+        if (renderId !== activeRenderIdRef.current) return false
+
+        if (hasRenderableContent()) {
+          setError(null)
+          setHasRenderedContent(true)
+          setIsLoading(false)
+          return true
+        }
+
+        await new Promise((resolve) => window.setTimeout(resolve, delayMs))
+      }
+
+      if (renderId !== activeRenderIdRef.current) return false
       syncCurrentLayoutMode(bookRef.current)
-      if (hasRenderableContent()) {
+
+      if (hasRenditionDocument()) {
+        setError(null)
         setHasRenderedContent(true)
         setIsLoading(false)
         return true
       }
 
-      await new Promise((resolve) => window.setTimeout(resolve, delayMs))
-    }
-
-    return false
-  }, [hasRenderableContent, syncCurrentLayoutMode])
+      setIsLoading(false)
+      setHasRenderedContent(false)
+      return false
+    },
+    [hasRenderableContent, hasRenditionDocument, syncCurrentLayoutMode, waitForPendingImagesInRendition],
+  )
 
   const attachRendition = useCallback(async (currentBook: BookWithLocations, target?: string) => {
     activeRenderIdRef.current += 1
@@ -640,6 +761,8 @@ export function useEpub({ fontSize, theme, layoutMode }: UseEpubOptions): UseEpu
     const viewerElement = await waitForViewer()
     viewerElement.scrollTop = 0
 
+    selectionAbortRef.current?.abort()
+    selectionAbortRef.current = null
     renditionRef.current?.destroy()
 
     const nextRendition = currentBook.renderTo(viewerElement, {
@@ -654,24 +777,83 @@ export function useEpub({ fontSize, theme, layoutMode }: UseEpubOptions): UseEpu
     applyTheme(nextRendition, themeRef.current, fontSizeRef.current)
 
     nextRendition.on('rendered', () => {
-      if (renderId !== activeRenderIdRef.current) return
-
       window.requestAnimationFrame(() => {
-        if (renderId !== activeRenderIdRef.current) return
         syncCurrentLayoutMode(currentBook)
-        scrollReaderToTop()
-        if (viewerRef.current) {
-          nextRendition.resize(viewerRef.current.clientWidth, viewerRef.current.clientHeight)
+        // In scroll mode, skip scrollReaderToTop and resize on chapter-navigation
+        // renders (renderId !== activeRenderIdRef.current). Both operations reset
+        // the container's scroll position and trigger 'relocated' with the old
+        // chapter's position, overriding the manual state updates in .then().
+        // The ResizeObserver handles real viewport-size changes for all modes.
+        // On the initial load render in scroll mode (renderId === activeRenderIdRef)
+        // we still resize to ensure correct iframe widths.
+        if (layoutModeRef.current !== 'scroll' || renderId === activeRenderIdRef.current) {
+          scrollReaderToTop()
+          if (viewerRef.current) {
+            nextRendition.resize(viewerRef.current.clientWidth, viewerRef.current.clientHeight)
+          }
         }
-        void waitForRenderableContent(renderId)
+        // Only drive the loading-state machine for the render that set it up.
+        // Page-turn handlers (nextPage/prevPage/etc.) increment activeRenderIdRef
+        // before their own display/next/prev call, so renderId will not match and
+        // waitForRenderableContent is correctly skipped here — their .then() handles it.
+        if (renderId === activeRenderIdRef.current) {
+          void waitForRenderableContent(renderId)
+        }
+
+        // Attach text-selection listeners to iframe documents.
+        // Abort any previous set before creating new ones.
+        selectionAbortRef.current?.abort()
+        const selectionAbort = new AbortController()
+        selectionAbortRef.current = selectionAbort
+        const { signal } = selectionAbort
+
+        try {
+          const contents = nextRendition.getContents()
+          for (const c of contents) {
+            const doc = (c as { document?: Document }).document
+            if (!doc) continue
+            doc.addEventListener(
+              'mouseup',
+              () => {
+                const sel = doc.getSelection()
+                const text = sel?.toString().trim() ?? ''
+                if (text.length < 3 || !onTextSelectedRef.current) return
+
+                const iframes = viewerRef.current?.querySelectorAll('iframe') ?? []
+                let targetIframe: HTMLIFrameElement | null = null
+                for (const iframe of Array.from(iframes)) {
+                  if (iframe.contentDocument === doc) {
+                    targetIframe = iframe as HTMLIFrameElement
+                    break
+                  }
+                }
+
+                const range = sel!.getRangeAt(0)
+                const rangeRect = range.getBoundingClientRect()
+                const iframeRect = targetIframe?.getBoundingClientRect() ?? { left: 0, top: 0 }
+
+                // Use viewport-absolute coords — the overlay is position:fixed so it
+                // won't be clipped by the epub viewer's overflow:hidden ancestor.
+                onTextSelectedRef.current(text, currentDisplayHrefRef.current, {
+                  x: iframeRect.left + rangeRect.left + rangeRect.width / 2,
+                  y: iframeRect.top + rangeRect.top,
+                })
+              },
+              { signal },
+            )
+          }
+        } catch {
+          // getContents() may throw before the rendition is ready — safe to ignore
+        }
       })
     })
 
     nextRendition.on('relocated', (location: EpubLocation) => {
-      if (renderId !== activeRenderIdRef.current) return
+      if (nextRendition !== renditionRef.current) return
 
       setCurrentLocation(location)
       setCurrentHref(location.start.href)
+      currentDisplayHrefRef.current = location.start.href
       currentCfiRef.current = location.start.cfi
       currentSpineIndexRef.current = location.start.index
       syncCurrentLayoutMode(currentBook)
@@ -708,7 +890,9 @@ export function useEpub({ fontSize, theme, layoutMode }: UseEpubOptions): UseEpu
       }
     })
 
-    await nextRendition.display(target ?? currentBook.spine.spineItems[0]?.href)
+    const displayTarget =
+      target ?? currentBook.spine.get()?.href ?? currentBook.spine.spineItems[0]?.href
+    await nextRendition.display(displayTarget)
     scrollReaderToTop()
     syncCurrentLayoutMode(currentBook)
 
@@ -723,8 +907,19 @@ export function useEpub({ fontSize, theme, layoutMode }: UseEpubOptions): UseEpu
       await waitForRenderableContent(renderId, 18, 120)
     }
 
+    if (renderId === activeRenderIdRef.current && !hasRenditionDocument()) {
+      setError('Unable to display this book.')
+    }
+
     return nextRendition
-  }, [applyTheme, scrollReaderToTop, syncCurrentLayoutMode, waitForRenderableContent, waitForViewer])
+  }, [
+    applyTheme,
+    hasRenditionDocument,
+    scrollReaderToTop,
+    syncCurrentLayoutMode,
+    waitForRenderableContent,
+    waitForViewer,
+  ])
 
   const loadBook = useCallback(async (file: File) => {
     activeLoadIdRef.current += 1
@@ -769,12 +964,13 @@ export function useEpub({ fontSize, theme, layoutMode }: UseEpubOptions): UseEpu
       ensureActiveLoad()
 
       const nextBook = ePub(buffer) as BookWithLocations
-      bookRef.current = nextBook
-      setBook(nextBook)
 
       const navigation = await loadTimeout(nextBook.loaded.navigation)
       const spine = await loadTimeout(nextBook.loaded.spine)
       ensureActiveLoad()
+
+      bookRef.current = nextBook
+      setBook(nextBook)
       const tocItems = normalizeTocItems(navigation.toc, spine.spineItems)
       tocRef.current = tocItems
       setToc(tocItems)
@@ -792,7 +988,8 @@ export function useEpub({ fontSize, theme, layoutMode }: UseEpubOptions): UseEpu
         setCover(null)
       }
 
-      const initialTarget = nextBook.spine.spineItems[0]?.href
+      const firstLinear = nextBook.spine.get()
+      const initialTarget = firstLinear?.href ?? nextBook.spine.spineItems[0]?.href
       ensureActiveLoad()
       await attachRendition(nextBook, initialTarget)
       ensureActiveLoad()
@@ -837,43 +1034,113 @@ export function useEpub({ fontSize, theme, layoutMode }: UseEpubOptions): UseEpu
   useEffect(() => {
     const currentBook = bookRef.current as BookWithLocations | null
     if (!currentBook || !viewerRef.current) return
+    if (currentBook.spine.spineItems.length === 0) return
 
-    const target = currentCfiRef.current || currentHref || currentBook.spine.spineItems[currentSpineIndexRef.current]?.href
+    const target =
+      currentCfiRef.current ||
+      currentHref ||
+      currentBook.spine.get(currentSpineIndexRef.current)?.href ||
+      currentBook.spine.get()?.href ||
+      currentBook.spine.spineItems[0]?.href
     setIsLoading(true)
     setHasRenderedContent(false)
 
     attachRendition(currentBook, target).catch(() => {
-      setIsLoading(false)
+      recoverFromFailedNavigation()
     })
-  }, [attachRendition, layoutMode])
+  }, [attachRendition, layoutMode, recoverFromFailedNavigation])
 
   const nextChapter = useCallback(() => {
-    if (!bookRef.current) return
+    const currentBook = bookRef.current
+    if (!currentBook) return
 
-    const nextIndex = currentSpineIndexRef.current + 1
-    const nextItem = bookRef.current.spine.spineItems[nextIndex]
-    if (nextItem) {
-      setIsLoading(true)
-      setHasRenderedContent(false)
-      renditionRef.current?.display(nextItem.href).then(() => {
-        scrollReaderToTop()
-      }).catch(() => {})
+    const path = splitHref(currentDisplayHrefRef.current).path
+    let current: SpineSection | undefined
+    if (path) {
+      current = currentBook.spine.get(path) ?? undefined
     }
-  }, [scrollReaderToTop])
+    if (!current) {
+      current = currentBook.spine.get(currentSpineIndexRef.current) ?? undefined
+    }
+
+    let nextSection = current?.next?.()
+    if (!nextSection && current) {
+      nextSection = nextLinearSpineItem(currentBook.spine.spineItems, current.index) ?? undefined
+    }
+    if (!nextSection) return
+
+    activeRenderIdRef.current += 1
+    const renderId = activeRenderIdRef.current
+    setIsLoading(true)
+    setHasRenderedContent(false)
+    const targetBook = currentBook
+    renditionRef.current
+      ?.display(nextSection.href)
+      .then(() => {
+        setError(null)
+        // Update position immediately — in scrolled-doc mode 'relocated' fires
+        // from scroll events, not programmatic display() calls, so we can't
+        // rely on it to advance position for the next navigation.
+        currentDisplayHrefRef.current = nextSection.href
+        currentSpineIndexRef.current = nextSection.index
+        const { current, total } = getSpinePosition(nextSection.index, targetBook.spine.spineItems)
+        setCurrentChapter(current)
+        setTotalChapters(total)
+        setCurrentPage(current)
+        setTotalPages(total)
+        // In scrolled-doc mode display() scrolls to the chapter — scrolling
+        // back to top would undo the navigation and fire 'relocated' with the
+        // wrong (previous) position.
+        if (layoutModeRef.current !== 'scroll') scrollReaderToTop()
+        void waitForRenderableContent(renderId, 16, 100)
+      })
+      .catch(() => {
+        recoverFromFailedNavigation()
+      })
+  }, [recoverFromFailedNavigation, scrollReaderToTop, waitForRenderableContent])
 
   const prevChapter = useCallback(() => {
-    if (!bookRef.current) return
+    const currentBook = bookRef.current
+    if (!currentBook) return
 
-    const prevIndex = currentSpineIndexRef.current - 1
-    const prevItem = bookRef.current.spine.spineItems[prevIndex]
-    if (prevItem) {
-      setIsLoading(true)
-      setHasRenderedContent(false)
-      renditionRef.current?.display(prevItem.href).then(() => {
-        scrollReaderToTop()
-      }).catch(() => {})
+    const path = splitHref(currentDisplayHrefRef.current).path
+    let current: SpineSection | undefined
+    if (path) {
+      current = currentBook.spine.get(path) ?? undefined
     }
-  }, [scrollReaderToTop])
+    if (!current) {
+      current = currentBook.spine.get(currentSpineIndexRef.current) ?? undefined
+    }
+
+    let prevSection = current?.prev?.()
+    if (!prevSection && current) {
+      prevSection = prevLinearSpineItem(currentBook.spine.spineItems, current.index) ?? undefined
+    }
+    if (!prevSection) return
+
+    activeRenderIdRef.current += 1
+    const renderId = activeRenderIdRef.current
+    setIsLoading(true)
+    setHasRenderedContent(false)
+    const targetBook = currentBook
+    renditionRef.current
+      ?.display(prevSection.href)
+      .then(() => {
+        setError(null)
+        currentDisplayHrefRef.current = prevSection.href
+        currentSpineIndexRef.current = prevSection.index
+        const { current, total } = getSpinePosition(prevSection.index, targetBook.spine.spineItems)
+        setCurrentChapter(current)
+        setTotalChapters(total)
+        setCurrentPage(current)
+        setTotalPages(total)
+        if (layoutModeRef.current !== 'scroll') scrollReaderToTop()
+        void waitForRenderableContent(renderId, 16, 100)
+      })
+      .catch(() => {
+        recoverFromFailedNavigation()
+      })
+  }, [recoverFromFailedNavigation, scrollReaderToTop, waitForRenderableContent])
 
   const nextPage = useCallback(() => {
     if (!renditionRef.current) return
@@ -895,10 +1162,19 @@ export function useEpub({ fontSize, theme, layoutMode }: UseEpubOptions): UseEpu
       return
     }
 
+    activeRenderIdRef.current += 1
+    const renderId = activeRenderIdRef.current
     setIsLoading(true)
     setHasRenderedContent(false)
-    renditionRef.current.next()
-  }, [getPrimaryScroller, nextChapter])
+    void renditionRef.current
+      .next()
+      .then(() => {
+        void waitForRenderableContent(renderId, 16, 100)
+      })
+      .catch(() => {
+        recoverFromFailedNavigation()
+      })
+  }, [getPrimaryScroller, nextChapter, recoverFromFailedNavigation, waitForRenderableContent])
 
   const prevPage = useCallback(() => {
     if (!renditionRef.current) return
@@ -919,33 +1195,191 @@ export function useEpub({ fontSize, theme, layoutMode }: UseEpubOptions): UseEpu
       return
     }
 
+    activeRenderIdRef.current += 1
+    const renderId = activeRenderIdRef.current
     setIsLoading(true)
     setHasRenderedContent(false)
-    renditionRef.current.prev()
-  }, [getPrimaryScroller, prevChapter])
+    void renditionRef.current
+      .prev()
+      .then(() => {
+        void waitForRenderableContent(renderId, 16, 100)
+      })
+      .catch(() => {
+        recoverFromFailedNavigation()
+      })
+  }, [getPrimaryScroller, prevChapter, recoverFromFailedNavigation, waitForRenderableContent])
 
   const goToHref = useCallback((href: string) => {
     const spineItems = bookRef.current?.spine.spineItems ?? []
     const resolvedHref = resolveTocHref(href, spineItems, currentHref)
+    activeRenderIdRef.current += 1
+    const renderId = activeRenderIdRef.current
     setIsLoading(true)
     setHasRenderedContent(false)
-    renditionRef.current?.display(resolvedHref).then(() => {
-      scrollReaderToTop()
-    }).catch(() => {})
-  }, [currentHref, scrollReaderToTop])
+    renditionRef.current
+      ?.display(resolvedHref)
+      .then(() => {
+        setError(null)
+        if (layoutModeRef.current !== 'scroll') scrollReaderToTop()
+        void waitForRenderableContent(renderId, 16, 100)
+      })
+      .catch(() => {
+        recoverFromFailedNavigation()
+      })
+  }, [currentHref, recoverFromFailedNavigation, scrollReaderToTop, waitForRenderableContent])
 
   const getCurrentText = useCallback((): string => {
     if (!renditionRef.current) return ''
 
     try {
       const contents = renditionRef.current.getContents()
-      return contents
-        .map((content: { document?: Document }) => (content.document?.body as HTMLElement | undefined)?.textContent ?? '')
-        .join(' ')
-        .replace(/\s+/g, ' ')
-        .trim()
+      const SENTENCE_ENDERS = /[.!?]$/
+      const blocks: string[] = []
+      for (const content of contents) {
+        const doc = (content as { document?: Document }).document
+        if (!doc) continue
+        const elements = doc.querySelectorAll('p, h1, h2, h3, h4, h5, h6, li, blockquote, td')
+        for (const el of Array.from(elements)) {
+          const t = (el.textContent ?? '').replace(/\s+/g, ' ').trim()
+          if (t.length < 2) continue
+          // Ensure each block ends with sentence-ending punctuation so splitSentences
+          // won't merge adjacent blocks (e.g. heading + first paragraph) into one sentence
+          blocks.push(SENTENCE_ENDERS.test(t) ? t : t + '.')
+        }
+      }
+      return blocks.join(' ')
     } catch {
       return ''
+    }
+  }, [])
+
+  const clearSentenceHighlight = useCallback(() => {
+    const contents = renditionRef.current?.getContents() ?? []
+    for (const c of contents) {
+      const doc = c.document
+      if (!doc) continue
+      // Unwrap inline <mark> highlights by replacing with their children
+      doc.querySelectorAll('mark[data-loci-reading]').forEach((mark) => {
+        mark.replaceWith(...Array.from(mark.childNodes))
+      })
+      // Merge the text nodes fragmented by surroundContents so subsequent
+      // indexOf searches see a single contiguous text node again
+      doc.normalize()
+      // Remove block-level fallback highlights
+      doc.querySelectorAll('[data-loci-reading]').forEach((el) => {
+        const h = el as HTMLElement
+        h.style.background = ''
+        h.style.borderRadius = ''
+        delete h.dataset.lociReading
+      })
+    }
+  }, [])
+
+  const highlightSentence = useCallback((sentenceText: string) => {
+    clearSentenceHighlight()
+    if (!sentenceText.trim()) return
+    if (!highlightEnabled) return
+
+    // Strip trailing punctuation added by getCurrentText; normalise whitespace
+    const search = sentenceText.replace(/[.!?]+$/, '').replace(/\s+/g, ' ').trim()
+    if (!search) return
+    const searchPrefix = search.slice(0, 20)
+
+    // Regex that matches the prefix with flexible whitespace (epub may use \t/\n/&nbsp;)
+    const prefixRe = new RegExp(
+      searchPrefix.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/\s+/g, '\\s+'),
+    )
+
+    const contents = renditionRef.current?.getContents() ?? []
+    for (const c of contents) {
+      const doc = c.document
+      if (!doc) continue
+
+      // Find the block element whose normalised textContent contains the sentence
+      const blocks = doc.querySelectorAll('p, li, blockquote, h1, h2, h3, h4, h5, h6, td')
+      for (const block of Array.from(blocks)) {
+        const blockNorm = (block.textContent ?? '').replace(/\s+/g, ' ')
+        if (!blockNorm.includes(searchPrefix)) continue
+
+        // Walk text nodes to find the one containing the sentence start
+        const walker = doc.createTreeWalker(block, NodeFilter.SHOW_TEXT)
+        let textNode: Text | null
+        let markedInline = false
+        while ((textNode = walker.nextNode() as Text | null)) {
+          const nodeText = textNode.textContent ?? ''
+          const m = nodeText.match(prefixRe)
+          if (!m || m.index === undefined) continue
+
+          // Wrap the matching text in a <mark> element
+          const mark = doc.createElement('mark')
+          mark.setAttribute('data-loci-reading', 'true')
+          mark.style.cssText =
+            'background:rgba(196,168,130,0.45);border-radius:3px;color:inherit;padding:1px 2px'
+          try {
+            const range = doc.createRange()
+            range.setStart(textNode, m.index)
+            range.setEnd(textNode, Math.min(m.index + search.length, nodeText.length))
+            range.surroundContents(mark)
+            markedInline = true
+          } catch {
+            // surroundContents fails when the range crosses element boundaries
+          }
+          break
+        }
+
+        if (!markedInline) {
+          // Sentence start spans an inline element boundary (e.g. <em>, <strong>) —
+          // fall back to a subtle block-level highlight so something always appears
+          ;(block as HTMLElement).setAttribute('data-loci-reading', 'true')
+          ;(block as HTMLElement).style.background = 'rgba(196,168,130,0.25)'
+        }
+
+        // Scroll the highlighted element into view if autoscroll is enabled
+        if (autoscrollEnabled) {
+          const el = doc.querySelector('[data-loci-reading]') as HTMLElement | null
+          el?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+        }
+        return
+      }
+    }
+  }, [clearSentenceHighlight, highlightEnabled, autoscrollEnabled])
+
+  const setOnTextSelected = useCallback(
+    (cb: ((quote: string, href: string, pos: { x: number; y: number }) => void) | null) => {
+      onTextSelectedRef.current = cb
+    },
+    [],
+  )
+
+  const applyAnnotationHighlights = useCallback((annotations: Annotation[]) => {
+    const contents = renditionRef.current?.getContents() ?? []
+    // Clear existing annotation highlights
+    for (const c of contents) {
+      c.document?.querySelectorAll('[data-loci-annotation]').forEach((el) => {
+        const h = el as HTMLElement
+        h.style.borderBottom = ''
+        h.style.paddingBottom = ''
+        delete h.dataset.lociAnnotation
+      })
+    }
+    // Apply each annotation
+    for (const annotation of annotations) {
+      const search = annotation.quote.slice(0, 40).trim()
+      if (!search) continue
+      for (const c of contents) {
+        const doc = c.document
+        if (!doc) continue
+        const blocks = doc.querySelectorAll('p, li, blockquote, h1, h2, h3, h4, h5, h6, td, div')
+        for (const block of Array.from(blocks)) {
+          if (block.textContent?.includes(search)) {
+            const h = block as HTMLElement
+            h.dataset.lociAnnotation = annotation.id
+            h.style.borderBottom = '2px solid var(--accent-warm)'
+            h.style.paddingBottom = '1px'
+            break
+          }
+        }
+      }
     }
   }, [])
 
@@ -971,6 +1405,10 @@ export function useEpub({ fontSize, theme, layoutMode }: UseEpubOptions): UseEpu
     prevChapter,
     goToHref,
     getCurrentText,
+    highlightSentence,
+    clearSentenceHighlight,
+    setOnTextSelected,
+    applyAnnotationHighlights,
     isLoading,
     hasRenderedContent,
     error,

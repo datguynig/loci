@@ -38,10 +38,15 @@ export function getElevenLabsProxyUrl(): string | null {
   return normalizeProxyUrl(import.meta.env.VITE_ELEVENLABS_PROXY_URL)
 }
 
-export function hasElevenLabsProxy(): boolean {
-  return getElevenLabsProxyUrl() !== null
+export function getElevenLabsApiKey(): string | null {
+  const key = import.meta.env.VITE_ELEVENLABS_API_KEY?.trim()
+  return key || null
+}
+
+export function hasElevenLabs(): boolean {
+  return getElevenLabsProxyUrl() !== null || getElevenLabsApiKey() !== null
 }
 
 export function resolveTtsProvider(): TTSProvider {
-  return hasElevenLabsProxy() ? 'elevenlabs' : 'browser'
+  return hasElevenLabs() ? 'elevenlabs' : 'browser'
 }

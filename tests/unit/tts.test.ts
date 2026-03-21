@@ -3,7 +3,7 @@ import {
   splitSentences,
   pickPreferredVoice,
   getElevenLabsProxyUrl,
-  hasElevenLabsProxy,
+  hasElevenLabs,
   resolveTtsProvider,
 } from '../../src/utils/tts'
 
@@ -57,15 +57,16 @@ describe('ElevenLabs proxy config', () => {
     vi.stubEnv('VITE_ELEVENLABS_PROXY_URL', 'https://tts.example.com///')
 
     expect(getElevenLabsProxyUrl()).toBe('https://tts.example.com')
-    expect(hasElevenLabsProxy()).toBe(true)
+    expect(hasElevenLabs()).toBe(true)
     expect(resolveTtsProvider()).toBe('elevenlabs')
   })
 
   it('falls back to browser TTS when no proxy is configured', () => {
     vi.stubEnv('VITE_ELEVENLABS_PROXY_URL', '')
+    vi.stubEnv('VITE_ELEVENLABS_API_KEY', '')
 
     expect(getElevenLabsProxyUrl()).toBeNull()
-    expect(hasElevenLabsProxy()).toBe(false)
+    expect(hasElevenLabs()).toBe(false)
     expect(resolveTtsProvider()).toBe('browser')
   })
 })

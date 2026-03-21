@@ -2,20 +2,26 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { motion } from 'framer-motion'
 import { useEpub, type FontSize, type Theme, type LayoutMode } from '../hooks/useEpub'
 import { useSpeech } from '../hooks/useSpeech'
+import { useAnnotations } from '../hooks/useAnnotations'
 import Sidebar from './Sidebar'
 import AudioBar from './AudioBar'
 import ProgressBar from './ProgressBar'
 import ThemeToggle from './ThemeToggle'
 import Toast, { type ToastMessage } from './Toast'
+import SelectionBubble from './SelectionBubble'
 
 interface ReaderProps {
   file: File
   theme: Theme
   fontSize: FontSize
   layoutMode: LayoutMode
+  highlightEnabled: boolean
+  autoscrollEnabled: boolean
   onThemeToggle: () => void
   onFontSizeChange: (s: FontSize) => void
   onLayoutModeChange: (mode: LayoutMode) => void
+  onHighlightChange: (v: boolean) => void
+  onAutoscrollChange: (v: boolean) => void
 }
 
 const FONT_SIZE_ORDER: FontSize[] = ['sm', 'md', 'lg', 'xl']
@@ -27,15 +33,39 @@ export default function Reader({
   theme,
   fontSize,
   layoutMode,
+  highlightEnabled,
+  autoscrollEnabled,
   onThemeToggle,
   onFontSizeChange,
   onLayoutModeChange,
+  onHighlightChange,
+  onAutoscrollChange,
 }: ReaderProps) {
-  const epub = useEpub({ fontSize, theme, layoutMode })
+  const epub = useEpub({ fontSize, theme, layoutMode, highlightEnabled, autoscrollEnabled })
   const speech = useSpeech()
+  const annotations = useAnnotations(epub.book?.key() ?? null)
 
   const [sidebarOpen, setSidebarOpen] = useState(false)
+  const [settingsOpen, setSettingsOpen] = useState(false)
   const [toasts, setToasts] = useState<ToastMessage[]>([])
+  const [selection, setSelection] = useState<{
+    quote: string
+    href: string
+    pos: { x: number; y: number }
+  } | null>(null)
+
+  // Mutually exclusive: close settings when a selection appears and vice versa
+  const openSelection = (s: { quote: string; href: string; pos: { x: number; y: number } }) => {
+    setSettingsOpen(false)
+    setSelection(s)
+  }
+  const closeSelection = () => setSelection(null)
+  const toggleSettings = () => {
+    setSettingsOpen((o) => {
+      if (!o) setSelection(null)
+      return !o
+    })
+  }
   const [navigationScope, setNavigationScope] = useState<'page' | 'chapter'>(
     layoutMode === 'scroll' ? 'chapter' : 'page',
   )
@@ -66,30 +96,76 @@ export default function Reader({
     if (epub.error) addToast(epub.error)
   }, [epub.error, addToast])
 
+  // One-time hint: tell the user they can select text to annotate
+  const hintShownRef = useRef(false)
+  useEffect(() => {
+    if (!epub.book || hintShownRef.current) return
+    hintShownRef.current = true
+    const timer = setTimeout(() => {
+      addToast('Tip: select any text to add a note')
+    }, 1800)
+    return () => clearTimeout(timer)
+  }, [epub.book, addToast])
+
   useEffect(() => {
     setNavigationScope(layoutMode === 'scroll' ? 'chapter' : 'page')
   }, [layoutMode])
 
+  const { clearSentenceHighlight } = epub
+
   // BUG-08: stop TTS when user navigates to a new page
   const handleNextPage = useCallback(() => {
     speech.stop()
+    clearSentenceHighlight()
     epub.nextPage()
-  }, [speech, epub.nextPage])
+  }, [speech, clearSentenceHighlight, epub.nextPage])
 
   const handlePrevPage = useCallback(() => {
     speech.stop()
+    clearSentenceHighlight()
     epub.prevPage()
-  }, [speech, epub.prevPage])
+  }, [speech, clearSentenceHighlight, epub.prevPage])
 
   const handleNextChapter = useCallback(() => {
     speech.stop()
+    clearSentenceHighlight()
     epub.nextChapter()
-  }, [speech, epub.nextChapter])
+  }, [speech, clearSentenceHighlight, epub.nextChapter])
 
   const handlePrevChapter = useCallback(() => {
     speech.stop()
+    clearSentenceHighlight()
     epub.prevChapter()
-  }, [speech, epub.prevChapter])
+  }, [speech, clearSentenceHighlight, epub.prevChapter])
+
+  // TTS reading highlight — glow the paragraph being spoken
+  const { highlightSentence } = epub
+  useEffect(() => {
+    if (speech.isPlaying && !speech.isPaused) {
+      const sentence = speech.sentences[speech.currentSentenceIndex]
+      if (sentence) highlightSentence(sentence)
+    } else {
+      clearSentenceHighlight()
+    }
+  }, [speech.currentSentenceIndex, speech.isPlaying, speech.isPaused, highlightSentence, clearSentenceHighlight])
+
+  // Re-apply annotation underlines whenever the chapter changes
+  const { applyAnnotationHighlights, setOnTextSelected, currentHref } = epub
+  const { annotationsForHref, addAnnotation, removeAnnotation } = annotations
+  useEffect(() => {
+    if (currentHref) applyAnnotationHighlights(annotationsForHref(currentHref))
+  }, [currentHref, applyAnnotationHighlights, annotationsForHref])
+
+  // Wire selection callback into epub hook
+  useEffect(() => {
+    setOnTextSelected((quote, href, pos) => openSelection({ quote, href, pos }))
+    return () => setOnTextSelected(null)
+  }, [setOnTextSelected])
+
+  // Dismiss selection bubble on chapter navigation
+  useEffect(() => {
+    closeSelection()
+  }, [currentHref])
 
   // BUG-05: destructure stable callbacks/values so the effect only re-runs when they change
   const { goToHref, toc, currentChapterIndex, getCurrentText } = epub
@@ -373,6 +449,11 @@ export default function Reader({
           currentHref={epub.currentHref}
           onNavigate={epub.goToHref}
           onClose={() => setSidebarOpen(false)}
+          annotations={annotations.annotations}
+          onDeleteAnnotation={(id) => {
+            removeAnnotation(id)
+            applyAnnotationHighlights(annotationsForHref(epub.currentHref))
+          }}
         />
 
         {/* epub.js viewer */}
@@ -393,6 +474,31 @@ export default function Reader({
             overflowX: 'hidden',
           }}
         />
+
+        {/* Selection bubble overlay — position:fixed so it's never clipped by overflow:hidden */}
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            pointerEvents: 'none',
+            zIndex: 60,
+          }}
+        >
+          {selection && (
+            <SelectionBubble
+              quote={selection.quote}
+              position={selection.pos}
+              onSave={(note) => {
+                addAnnotation(selection.href, selection.quote, note)
+                closeSelection()
+                // Re-apply highlights so the new underline appears immediately
+                setTimeout(() => applyAnnotationHighlights(annotationsForHref(selection.href)), 50)
+                addToast('Note saved')
+              }}
+              onDismiss={closeSelection}
+            />
+          )}
+        </div>
 
         {/* Loading overlay */}
         {epub.isLoading && (
@@ -581,6 +687,12 @@ export default function Reader({
         onStop={speech.stop}
         onSkipForward={speech.skipForward}
         onSkipBack={speech.skipBack}
+        highlightEnabled={highlightEnabled}
+        onHighlightChange={onHighlightChange}
+        autoscrollEnabled={autoscrollEnabled}
+        onAutoscrollChange={onAutoscrollChange}
+        settingsOpen={settingsOpen}
+        onSettingsToggle={toggleSettings}
       />
 
       {/* Toast notifications */}

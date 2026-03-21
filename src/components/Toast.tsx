@@ -23,7 +23,7 @@ function ToastItem({ message, onDismiss }: { message: ToastMessage; onDismiss: (
   return (
     <motion.div
       layout
-      initial={{ opacity: 0, x: 20, y: 0 }}
+      initial={{ opacity: 0, x: 20, y: -8 }}
       animate={{ opacity: 1, x: 0, y: 0 }}
       exit={{ opacity: 0, x: 20 }}
       transition={{ duration: 0.18, ease: 'easeOut' }}
@@ -66,9 +66,12 @@ function ToastItem({ message, onDismiss }: { message: ToastMessage; onDismiss: (
 export default function Toast({ messages, onDismiss }: ToastProps) {
   return (
     <div
+      role="status"
+      aria-live="polite"
+      aria-atomic="false"
       style={{
         position: 'fixed',
-        bottom: 80,
+        top: 16,
         right: 16,
         zIndex: 100,
         display: 'flex',

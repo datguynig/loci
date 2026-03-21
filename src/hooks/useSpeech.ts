@@ -6,7 +6,7 @@ import {
   type ElevenLabsModel,
   type ElevenLabsVoice,
 } from '../services/ttsService'
-import { splitSentences, pickPreferredVoice, resolveTtsProvider, hasElevenLabsProxy } from '../utils/tts'
+import { splitSentences, pickPreferredVoice, resolveTtsProvider, hasElevenLabs } from '../utils/tts'
 
 export interface UseSpeechReturn {
   speak: (text: string) => void
@@ -36,7 +36,7 @@ export interface UseSpeechReturn {
 }
 
 export function useSpeech(): UseSpeechReturn {
-  const hasElevenLabs = hasElevenLabsProxy()
+  const hasElevenLabsConfigured = hasElevenLabs()
   const [provider] = useState<TTSProvider>(resolveTtsProvider())
 
   const [isPlaying, setIsPlaying] = useState(false)
@@ -76,7 +76,7 @@ export function useSpeech(): UseSpeechReturn {
 
   // Load ElevenLabs voices on init
   useEffect(() => {
-    if (!hasElevenLabs) return
+    if (!hasElevenLabsConfigured) return
     fetchElevenLabsVoices()
       .then((voices) => {
         setElevenLabsVoices(voices)
@@ -91,7 +91,7 @@ export function useSpeech(): UseSpeechReturn {
       .catch(() => {
         // Silently ignore — will fall back to browser TTS
       })
-  }, [hasElevenLabs])
+  }, [hasElevenLabsConfigured])
 
   // Load browser voices
   useEffect(() => {

@@ -18,4 +18,24 @@ export default defineConfig({
       target: 'esnext',
     },
   },
+  test: {
+    environment: 'jsdom',
+    include: ['tests/unit/**/*.test.ts'],
+    coverage: {
+      provider: 'v8',
+      include: [
+        'src/utils/**',
+        'src/services/annotationService.ts',
+        'src/hooks/usePreferences.ts',
+      ],
+      exclude: [],
+      thresholds: {
+        lines: 80,
+        branches: 80,
+        functions: 80,
+        statements: 80,
+      },
+      reporter: ['text', 'html'],
+    },
+  },
 })
