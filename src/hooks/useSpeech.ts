@@ -6,8 +6,7 @@ import {
   type ElevenLabsModel,
   type ElevenLabsVoice,
 } from '../services/ttsService'
-
-const ELEVENLABS_API_KEY = import.meta.env.VITE_ELEVENLABS_API_KEY as string | undefined
+import { splitSentences, pickPreferredVoice, resolveTtsProvider, hasElevenLabsProxy } from '../utils/tts'
 
 export interface UseSpeechReturn {
   speak: (text: string) => void
@@ -36,35 +35,9 @@ export interface UseSpeechReturn {
   sentences: string[]
 }
 
-const PREFERRED_BROWSER_VOICES = [
-  'Google UK English Female',
-  'Google US English',
-  'Daniel',
-  'Samantha',
-  'Karen',
-]
-
-function splitSentences(text: string): string[] {
-  // Split on sentence-ending punctuation followed by whitespace
-  const raw = text.split(/(?<=[.!?])\s+/)
-  return raw
-    .map((s) => s.trim())
-    .filter((s) => s.length > 3)
-}
-
-function pickPreferredVoice(voices: SpeechSynthesisVoice[]): SpeechSynthesisVoice | null {
-  for (const name of PREFERRED_BROWSER_VOICES) {
-    const found = voices.find((v) => v.name.includes(name))
-    if (found) return found
-  }
-  // Prefer en-GB or en-US voices
-  const english = voices.find((v) => v.lang.startsWith('en'))
-  return english ?? voices[0] ?? null
-}
-
 export function useSpeech(): UseSpeechReturn {
-  const hasElevenLabs = Boolean(ELEVENLABS_API_KEY)
-  const [provider] = useState<TTSProvider>(hasElevenLabs ? 'elevenlabs' : 'browser')
+  const hasElevenLabs = hasElevenLabsProxy()
+  const [provider] = useState<TTSProvider>(resolveTtsProvider())
 
   const [isPlaying, setIsPlaying] = useState(false)
   const [isPaused, setIsPaused] = useState(false)
@@ -103,8 +76,8 @@ export function useSpeech(): UseSpeechReturn {
 
   // Load ElevenLabs voices on init
   useEffect(() => {
-    if (!hasElevenLabs || !ELEVENLABS_API_KEY) return
-    fetchElevenLabsVoices(ELEVENLABS_API_KEY)
+    if (!hasElevenLabs) return
+    fetchElevenLabsVoices()
       .then((voices) => {
         setElevenLabsVoices(voices)
         if (voices.length > 0 && !voiceIdRef.current) {
@@ -174,7 +147,6 @@ export function useSpeech(): UseSpeechReturn {
           sentencesRef.current[idx],
           {
             provider: 'elevenlabs',
-            apiKey: ELEVENLABS_API_KEY,
             voiceId: voiceIdRef.current,
             model: modelRef.current,
             rate: rateRef.current,

@@ -14,8 +14,7 @@ export default function Landing({ onFileSelected }: LandingProps) {
     (file: File) => {
       const isEpub =
         file.name.toLowerCase().endsWith('.epub') ||
-        file.type === 'application/epub+zip' ||
-        file.type === 'application/octet-stream'
+        file.type === 'application/epub+zip'
 
       if (!isEpub) {
         setError("This file doesn't appear to be a valid EPUB")

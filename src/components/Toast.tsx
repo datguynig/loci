@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 
 export interface ToastMessage {
@@ -12,10 +12,13 @@ interface ToastProps {
 }
 
 function ToastItem({ message, onDismiss }: { message: ToastMessage; onDismiss: () => void }) {
+  const onDismissRef = useRef(onDismiss)
+  useEffect(() => { onDismissRef.current = onDismiss })
+
   useEffect(() => {
-    const t = setTimeout(onDismiss, 4000)
+    const t = setTimeout(() => onDismissRef.current(), 4000)
     return () => clearTimeout(t)
-  }, [onDismiss])
+  }, []) // run once on mount — ref keeps callback current
 
   return (
     <motion.div

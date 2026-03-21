@@ -15,6 +15,7 @@ declare module 'epubjs' {
     cfi: string
     href: string
     index: number
+    location?: number
     displayed: DisplayedLocation
   }
 
@@ -22,6 +23,7 @@ declare module 'epubjs' {
     cfi: string
     href: string
     index: number
+    location?: number
     displayed: DisplayedLocation
   }
 
@@ -100,6 +102,8 @@ declare module 'epubjs' {
         spread?: string
         minSpreadWidth?: number
         defaultDirection?: string
+        allowScriptedContent?: boolean
+        fullsize?: boolean
       }
     ): Rendition
     loaded: {

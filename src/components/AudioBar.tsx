@@ -1,8 +1,9 @@
 import { motion } from 'framer-motion'
 import type { TTSProvider, ElevenLabsModel } from '../services/ttsService'
 import type { ElevenLabsVoice } from '../services/ttsService'
+import { hasElevenLabsProxy } from '../utils/tts'
 
-const HAS_ELEVENLABS = Boolean(import.meta.env.VITE_ELEVENLABS_API_KEY)
+const HAS_ELEVENLABS = hasElevenLabsProxy()
 
 interface AudioBarProps {
   isPlaying: boolean
@@ -29,8 +30,6 @@ interface AudioBarProps {
   onStop: () => void
   onSkipForward: () => void
   onSkipBack: () => void
-  onPrevPage: () => void
-  onNextPage: () => void
 }
 
 const SPEED_OPTIONS = [0.5, 0.75, 1, 1.25, 1.5, 1.75, 2]
@@ -143,8 +142,6 @@ export default function AudioBar({
   onStop,
   onSkipForward,
   onSkipBack,
-  onPrevPage,
-  onNextPage,
 }: AudioBarProps) {
   const currentSentence = sentences[currentSentenceIndex] ?? ''
 
@@ -172,12 +169,7 @@ export default function AudioBar({
       animate={{ y: 0, opacity: 1 }}
       transition={{ duration: 0.2, ease: 'easeOut' }}
       style={{
-        position: 'fixed',
-        bottom: 0,
-        left: 0,
-        right: 0,
-        zIndex: 30,
-        background: 'rgba(var(--bg-surface-rgb, 255,255,255), 0.85)',
+        background: 'rgba(var(--bg-surface-rgb), 0.92)',
         backdropFilter: 'blur(20px)',
         WebkitBackdropFilter: 'blur(20px)',
         borderTop: '1px solid var(--border)',
@@ -223,13 +215,6 @@ export default function AudioBar({
       >
         {/* Left: transport controls */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-          <ControlButton onClick={onPrevPage} label="Previous page">
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
-              <polygon points="19 20 9 12 19 4 19 20" />
-              <line x1="5" y1="19" x2="5" y2="5" stroke="currentColor" strokeWidth="2" />
-            </svg>
-          </ControlButton>
-
           <ControlButton onClick={onSkipBack} label="Skip back">
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <polyline points="1 4 1 10 7 10" />
@@ -245,13 +230,6 @@ export default function AudioBar({
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <polyline points="23 4 23 10 17 10" />
               <path d="M20.49 15a9 9 0 1 1-.49-4.5" />
-            </svg>
-          </ControlButton>
-
-          <ControlButton onClick={onNextPage} label="Next page">
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
-              <polygon points="5 4 15 12 5 20 5 4" />
-              <line x1="19" y1="5" x2="19" y2="19" stroke="currentColor" strokeWidth="2" />
             </svg>
           </ControlButton>
 
@@ -357,7 +335,7 @@ export default function AudioBar({
                   color: 'var(--text-tertiary)',
                 }}
               >
-                Upgrade voice
+                Browser voice
               </span>
             )
           )}

@@ -4,7 +4,7 @@ import type { NavItem } from 'epubjs'
 interface SidebarProps {
   toc: NavItem[]
   isOpen: boolean
-  currentChapterIndex: number
+  currentHref: string
   onNavigate: (href: string) => void
   onClose: () => void
 }
@@ -12,11 +12,21 @@ interface SidebarProps {
 interface TocItemProps {
   item: NavItem
   depth: number
-  isActive: boolean
+  currentHref: string
   onNavigate: (href: string) => void
 }
 
-function TocItemRow({ item, depth, isActive, onNavigate }: TocItemProps) {
+function normaliseHref(href: string): string {
+  return href.split('#')[0]
+}
+
+function isHrefActive(itemHref: string, currentHref: string): boolean {
+  return normaliseHref(itemHref) === normaliseHref(currentHref)
+}
+
+function TocItemRow({ item, depth, currentHref, onNavigate }: TocItemProps) {
+  const isActive = isHrefActive(item.href, currentHref)
+
   return (
     <>
       <button
@@ -58,7 +68,7 @@ function TocItemRow({ item, depth, isActive, onNavigate }: TocItemProps) {
           key={`${sub.href}-${i}`}
           item={sub}
           depth={depth + 1}
-          isActive={false}
+          currentHref={currentHref}
           onNavigate={onNavigate}
         />
       ))}
@@ -66,7 +76,7 @@ function TocItemRow({ item, depth, isActive, onNavigate }: TocItemProps) {
   )
 }
 
-export default function Sidebar({ toc, isOpen, currentChapterIndex, onNavigate, onClose }: SidebarProps) {
+export default function Sidebar({ toc, isOpen, currentHref, onNavigate, onClose }: SidebarProps) {
   return (
     <AnimatePresence>
       {isOpen && (
@@ -170,7 +180,7 @@ export default function Sidebar({ toc, isOpen, currentChapterIndex, onNavigate, 
                     key={`${item.href}-${i}`}
                     item={item}
                     depth={0}
-                    isActive={i === currentChapterIndex}
+                    currentHref={currentHref}
                     onNavigate={(href) => {
                       onNavigate(href)
                       onClose()

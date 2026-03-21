@@ -11,6 +11,7 @@
   --bg-primary: #F8F7F4;
   --bg-secondary: #EFEDE8;
   --bg-surface: #FFFFFF;
+  --bg-surface-rgb: 255, 255, 255;
   --text-primary: #1A1A1A;
   --text-secondary: #6B6560;
   --text-tertiary: #B0ACA6;
@@ -27,6 +28,7 @@
   --bg-primary: #111110;
   --bg-secondary: #1C1C1A;
   --bg-surface: #242422;
+  --bg-surface-rgb: 36, 36, 34;
   --text-primary: #F0EDE8;
   --text-secondary: #8A8780;
   --text-tertiary: #4A4845;
@@ -61,8 +63,8 @@ body {
 
 /* epub.js viewer container */
 #epub-viewer {
-  width: 100%;
-  height: 100%;
+  position: absolute;
+  inset: 0;
 }
 
 #epub-viewer iframe {
