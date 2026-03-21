@@ -140,3 +140,4 @@ vite.config.ts.timestamp-*
 
 # Sample EPUB files (copyrighted study material)
 public/*.epub
+.worktrees/
