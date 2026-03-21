@@ -26,19 +26,23 @@ export async function* sendStudyMessage(
   messages: Message[],
   context: StudyContext,
 ): AsyncGenerator<string> {
+  // Try to get the Clerk JWT; fall back gracefully — the edge function
+  // is deployed with verify_jwt = false so a user token is not required.
   const clerkToken = await getToken().catch(() => null)
-  const authToken = clerkToken ?? (import.meta.env.VITE_SUPABASE_ANON_KEY as string)
+
+  const headers: Record<string, string> = {
+    apikey: import.meta.env.VITE_SUPABASE_ANON_KEY as string,
+    'Content-Type': 'application/json',
+  }
+  if (clerkToken) {
+    headers['Authorization'] = `Bearer ${clerkToken}`
+  }
 
   const response = await fetch(
     `${import.meta.env.VITE_SUPABASE_URL as string}/functions/v1/ai-study`,
     {
       method: 'POST',
-      headers: {
-        // apikey is always the anon key — Supabase gateway requires it
-        apikey: import.meta.env.VITE_SUPABASE_ANON_KEY as string,
-        Authorization: `Bearer ${authToken}`,
-        'Content-Type': 'application/json',
-      },
+      headers,
       body: JSON.stringify({ action, messages, context }),
     },
   )
