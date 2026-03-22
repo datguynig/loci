@@ -200,6 +200,8 @@ export default function AudioBar({
         WebkitBackdropFilter: 'blur(20px)',
         borderTop: '1px solid var(--border)',
         flexShrink: 0,
+        position: 'relative',
+        zIndex: 30,
       }}
     >
       {/* Current sentence preview — fixed height to prevent epub viewer from resizing on play */}

@@ -93,8 +93,8 @@ test.describe('Landing page', () => {
       mimeType: 'application/epub+zip',
       buffer: Buffer.from('this is not a valid epub zip file'),
     })
-    // epub.js will fail to open the corrupt file — loading overlay or error should appear
-    await expect(page.getByText(/loading|unable to read|doesn't appear/i)).toBeVisible({ timeout: 15_000 })
+    // epub.js will fail to open the corrupt file — error message should appear
+    await expect(page.getByText(/unable to read|doesn't appear/i).first()).toBeVisible({ timeout: 15_000 })
   })
 
   test('accepts a valid EPUB and transitions to reader', async ({ page }) => {
@@ -419,6 +419,26 @@ test.describe('Theme toggle', () => {
       document.documentElement.getAttribute('data-theme'),
     )
     expect(final).toBe(initial)
+  })
+
+  test('dark mode injects light text color into epub iframe', async ({ page }) => {
+    // Force dark mode
+    await page.evaluate(() => document.documentElement.setAttribute('data-theme', 'light'))
+    // Switch to dark via toggle
+    await page.getByLabel(/Switch to (dark|light) mode/).click()
+    await expect(page.evaluate(() => document.documentElement.getAttribute('data-theme'))).resolves.toBe('dark')
+
+    // Wait for the override style to be injected (rendered event fires after chapter loads)
+    await page.waitForTimeout(500)
+
+    // Check that the epub iframe body has a light text color (our !important override)
+    const bodyColor = await page.evaluate(() => {
+      const iframe = document.querySelector('#epub-viewer iframe') as HTMLIFrameElement | null
+      if (!iframe?.contentDocument) return null
+      return iframe.contentDocument.getElementById('loci-dark-override')?.textContent ?? null
+    })
+    expect(bodyColor).not.toBeNull()
+    expect(bodyColor).toContain('#F0EDE8')
   })
 })
 
