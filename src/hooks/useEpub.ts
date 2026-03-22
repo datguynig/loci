@@ -843,6 +843,8 @@ export function useEpub({ fontSize, theme, layoutMode, highlightEnabled = true, 
           for (const c of contents) {
             const doc = (c as { document?: Document }).document
             if (!doc) continue
+            // Re-inject dark-mode override here (after EPUB's own CSS has loaded)
+            injectThemeOverride(doc, themeRef.current)
             doc.addEventListener(
               'mouseup',
               (e) => {

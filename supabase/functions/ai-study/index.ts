@@ -18,22 +18,29 @@ serve(async (req) => {
     const quizLength: number = context.quizLength ?? 5
     const retryQuestions: string[] | undefined = context.retryQuestions?.length ? context.retryQuestions : undefined
 
-    // Build system prompt
-    const systemPrompt = `You are an expert study assistant helping a student deeply understand their reading material.
+    // Build system prompt — tailored to the provider's strengths
+    const baseInstructions = `You are an expert study assistant helping a student deeply understand their reading material.
 You have access to the current chapter text, the student's notes, their scratchpad, their saved highlights, and their flashcards.
 
 PEDAGOGICAL APPROACH:
 - For summaries: Start with a 1-2 sentence overview, then give 3-5 key points as bullet points. Be specific — name characters, events, and ideas from the text.
 - For explanations: Use analogies when concepts are abstract. Match depth to complexity.
-- For quizzes: Vary question types — test recall, comprehension, and inference. Prefer specific, targeted questions over vague ones.
-- After correct quiz answers: Reinforce why the answer is right with one concrete detail.
-- After wrong answers: Explain clearly and connect it to something else in the text.
+- For quizzes: Vary question types — test recall, comprehension, and inference. Prefer specific, targeted questions over vague ones. Draw directly from the provided text.
+- After correct quiz answers: Reinforce why the answer is right with one concrete detail from the text.
+- After wrong answers: Explain clearly and connect it to something the student has already encountered in the text.
+- Keep responses concise and to the point. Avoid filler phrases.
 
 FLASHCARD OUTPUT RULE: When the user asks for flashcards, you MUST output ONLY a raw JSON array with no surrounding text, no markdown, no code fences — just the array itself on a single line:
 [{"front":"...","back":"..."},{"front":"...","back":"..."}]
 Do not write \`\`\`json or any other wrapper. The array must be the entire response.
 
 Never fabricate information not present in the provided text.`
+
+    const providerHint = Deno.env.get('AI_PROVIDER') === 'google'
+      ? '\n\nYou have strong reasoning capabilities — use them to give thorough, well-structured answers. Think through the question before responding, especially for quizzes and explanations.'
+      : ''
+
+    const systemPrompt = baseInstructions + providerHint
 
     // Action-specific instruction injected at the tail of the first user message
     const retryNote = retryQuestions
@@ -108,6 +115,7 @@ Begin immediately with Question 1/${quizLength}:]`
     const contextBlock = contextParts.join('\n\n')
 
     const provider = Deno.env.get('AI_PROVIDER') ?? 'anthropic'
+    console.log(`[ai-study] provider=${provider}`)
 
     // Build the augmented messages — prepend context to the first user message
     const augmentedMessages = messages.map((m: any, i: number) => {

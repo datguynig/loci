@@ -607,6 +607,16 @@ export default function StudyPanel({
   const total = quizState.total
 
   function renderAssistantMsg(content: string, idx: number, isLast: boolean) {
+    // While streaming a flashcard response, hide the raw JSON accumulation
+    if (streaming && isLast && content.trimStart().startsWith('[')) {
+      return (
+        <div key={idx} style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          <AiAvatar />
+          <ThinkingDots />
+        </div>
+      )
+    }
+
     const kind = classifyMsg(content, quizState.active)
 
     if (kind.type === 'flashcards') {
