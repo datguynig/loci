@@ -109,38 +109,59 @@ function AnnotationCard({
         position: 'relative',
       }}
     >
-      {/* Chapter label */}
-      <div
-        style={{
-          fontFamily: 'var(--font-ui)',
-          fontSize: 10,
-          fontWeight: 600,
-          letterSpacing: '0.06em',
-          textTransform: 'uppercase',
-          color: 'var(--accent-warm)',
-          marginBottom: 4,
-        }}
-      >
-        {chapterLabel}
+      {/* Chapter label + type badge */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+        <div
+          style={{
+            fontFamily: 'var(--font-ui)',
+            fontSize: 10,
+            fontWeight: 600,
+            letterSpacing: '0.06em',
+            textTransform: 'uppercase',
+            color: 'var(--accent-warm)',
+          }}
+        >
+          {chapterLabel}
+        </div>
+        {annotation.type === 'chapter_note' && (
+          <div
+            style={{
+              fontFamily: 'var(--font-ui)',
+              fontSize: 9,
+              fontWeight: 500,
+              letterSpacing: '0.04em',
+              textTransform: 'uppercase',
+              color: 'var(--text-tertiary)',
+              background: 'var(--bg-secondary)',
+              border: '1px solid var(--border)',
+              borderRadius: 4,
+              padding: '1px 5px',
+            }}
+          >
+            Note
+          </div>
+        )}
       </div>
 
-      {/* Quote */}
-      <div
-        style={{
-          fontFamily: 'var(--font-reading)',
-          fontStyle: 'italic',
-          fontSize: 12,
-          color: 'var(--text-secondary)',
-          marginBottom: annotation.note ? 6 : 0,
-          overflow: 'hidden',
-          display: '-webkit-box',
-          WebkitLineClamp: 2,
-          WebkitBoxOrient: 'vertical',
-          lineHeight: 1.5,
-        }}
-      >
-        "{annotation.quote}"
-      </div>
+      {/* Quote block — only for highlight annotations */}
+      {annotation.type !== 'chapter_note' && (
+        <div
+          style={{
+            fontFamily: 'var(--font-reading)',
+            fontStyle: 'italic',
+            fontSize: 12,
+            color: 'var(--text-secondary)',
+            marginBottom: annotation.note ? 6 : 0,
+            overflow: 'hidden',
+            display: '-webkit-box',
+            WebkitLineClamp: 2,
+            WebkitBoxOrient: 'vertical',
+            lineHeight: 1.5,
+          }}
+        >
+          "{annotation.quote}"
+        </div>
+      )}
 
       {/* Note text */}
       {annotation.note && (
@@ -176,13 +197,19 @@ function AnnotationCard({
             border: 'none',
             color: 'var(--text-tertiary)',
             cursor: 'pointer',
-            fontSize: 16,
-            lineHeight: 1,
-            padding: 2,
+            padding: 4,
             borderRadius: 4,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            transition: 'color 100ms ease',
           }}
+          onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--text-secondary)' }}
+          onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--text-tertiary)' }}
         >
-          ×
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+            <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+          </svg>
         </button>
       )}
     </div>
@@ -253,13 +280,19 @@ function BookmarkRow({
             border: 'none',
             color: 'var(--text-tertiary)',
             cursor: 'pointer',
-            fontSize: 16,
-            lineHeight: 1,
-            padding: 2,
+            padding: 4,
             borderRadius: 4,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            transition: 'color 100ms ease',
           }}
+          onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--text-secondary)' }}
+          onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--text-tertiary)' }}
         >
-          ×
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+            <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+          </svg>
         </button>
       )}
     </div>

@@ -7,6 +7,8 @@ import { loadProgress } from '../services/progressService'
 import { formatDuration } from '../utils/formatDuration'
 import { type Flashcard, getFlashcards } from '../services/flashcardService'
 import { getScratchpad } from '../services/scratchpadService'
+import { getQuizSessions, getBestScore } from '../services/quizService'
+import type { QuizSession } from '../services/quizService'
 import {
   type Book,
   archiveBook,
@@ -48,6 +50,7 @@ export default function BookDetailModal({
   const [deleting, setDeleting] = useState(false)
   const [flashcards, setFlashcards] = useState<Flashcard[]>([])
   const [scratchpadPreview, setScratchpadPreview] = useState('')
+  const [quizSessions, setQuizSessions] = useState<QuizSession[]>([])
   const reviewRef = useRef<HTMLTextAreaElement>(null)
 
   useEffect(() => {
@@ -59,6 +62,7 @@ export default function BookDetailModal({
     getScratchpad(supabase, book.id)
       .then(text => setScratchpadPreview(text.slice(0, 200)))
       .catch(console.error)
+    getQuizSessions(supabase, book.id).then(setQuizSessions).catch(console.error)
   }, [supabase, book.id])
 
   // Close on Escape
@@ -184,19 +188,22 @@ export default function BookDetailModal({
             justifyContent: 'center',
             cursor: 'pointer',
             color: 'rgba(255,255,255,0.85)',
-            fontSize: 18,
-            lineHeight: 1,
             zIndex: 2,
             pointerEvents: 'auto',
+            transition: 'background 150ms ease',
           }}
+          onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(255,255,255,0.28)' }}
+          onMouseLeave={(e) => { e.currentTarget.style.background = 'rgba(255,255,255,0.18)' }}
         >
-          ×
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+            <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+          </svg>
         </button>
 
         <div
           onClick={(e) => e.stopPropagation()}
           style={{
-            background: '#FFFFFF',
+            background: 'var(--bg-surface)',
             borderRadius: 20,
             boxShadow: '0 32px 80px rgba(0,0,0,0.22), 0 2px 8px rgba(0,0,0,0.06)',
             width: '100%',
@@ -278,7 +285,7 @@ export default function BookDetailModal({
               Read
             </button>
 
-            {(totalReadingSeconds > 0 || flashcards.length > 0 || annotations.length > 0) && (
+            {(totalReadingSeconds > 0 || flashcards.length > 0 || annotations.length > 0 || quizSessions.length > 0) && (
               <div style={{
                 width: 168,
                 background: '#EAE7E1',
@@ -291,7 +298,7 @@ export default function BookDetailModal({
                 {totalReadingSeconds > 0 && (
                   <StatRow label="Reading time" value={formatDuration(totalReadingSeconds)} warm={false} />
                 )}
-                {totalReadingSeconds > 0 && (flashcards.length > 0 || annotations.length > 0) && (
+                {totalReadingSeconds > 0 && (flashcards.length > 0 || annotations.length > 0 || quizSessions.length > 0) && (
                   <div style={{ height: 1, background: '#D8D4CC' }} />
                 )}
                 {flashcards.length > 0 && (
@@ -307,6 +314,12 @@ export default function BookDetailModal({
                   const highlightCount = annotations.filter(a => a.type === 'note').length
                   return highlightCount > 0 ? (
                     <StatRow label="Highlights" value={String(highlightCount)} warm={false} />
+                  ) : null
+                })()}
+                {(() => {
+                  const best = getBestScore(quizSessions)
+                  return best ? (
+                    <StatRow label="Best quiz" value={`${best.score} / ${best.total}`} warm={true} />
                   ) : null
                 })()}
               </div>
@@ -575,7 +588,10 @@ export default function BookDetailModal({
                   No notes yet. Select text or tap + Note while reading.
                 </p>
               ) : (
-                <NotesList annotations={annotations} />
+                <NotesList
+                  annotations={annotations}
+                  onNavigate={onStudy ? (href) => onStudy({ chapterHref: href }) : undefined}
+                />
               )}
             </div>
 
@@ -713,7 +729,14 @@ function StatRow({ label, value, warm }: { label: string; value: string; warm: b
   )
 }
 
-function NotesList({ annotations }: { annotations: Annotation[] }) {
+function NotesList({
+  annotations,
+  onNavigate,
+}: {
+  annotations: Annotation[]
+  onNavigate?: (href: string) => void
+}) {
+  const [hoveredId, setHoveredId] = useState<string | null>(null)
   const byChapter = new Map<string, Annotation[]>()
   for (const a of annotations) {
     const chapter = a.href.split('#')[0]
@@ -740,23 +763,29 @@ function NotesList({ annotations }: { annotations: Annotation[] }) {
             {notes.map((note) => (
               <div
                 key={note.id}
+                onMouseEnter={() => setHoveredId(note.id)}
+                onMouseLeave={() => setHoveredId(null)}
                 style={{
-                  background: '#FAFAF8',
+                  background: hoveredId === note.id ? '#F4F2EE' : '#FAFAF8',
                   borderRadius: 8,
                   padding: '10px 12px',
                   display: 'flex',
                   flexDirection: 'column',
                   gap: 4,
+                  transition: 'background 120ms ease',
+                  position: 'relative',
                 }}
               >
-                <p style={{
-                  fontFamily: '"Lora", Georgia, serif',
-                  fontSize: 13,
-                  fontStyle: 'italic',
-                  color: '#6B6863',
-                  margin: 0,
-                  lineHeight: 1.55,
-                }}>"{note.quote}"</p>
+                {note.type !== 'chapter_note' && (
+                  <p style={{
+                    fontFamily: '"Lora", Georgia, serif',
+                    fontSize: 13,
+                    fontStyle: 'italic',
+                    color: '#6B6863',
+                    margin: 0,
+                    lineHeight: 1.55,
+                  }}>"{note.quote}"</p>
+                )}
                 {note.note && (
                   <p style={{
                     fontFamily: '"DM Sans", system-ui, sans-serif',
@@ -766,12 +795,31 @@ function NotesList({ annotations }: { annotations: Annotation[] }) {
                     lineHeight: 1.5,
                   }}>{note.note}</p>
                 )}
-                <p style={{
-                  fontFamily: '"DM Sans", system-ui, sans-serif',
-                  fontSize: 11,
-                  color: '#C4A882',
-                  margin: 0,
-                }}>{new Date(note.createdAt).toLocaleDateString()}</p>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 2 }}>
+                  <p style={{
+                    fontFamily: '"DM Sans", system-ui, sans-serif',
+                    fontSize: 11,
+                    color: '#C4A882',
+                    margin: 0,
+                  }}>{new Date(note.createdAt).toLocaleDateString()}</p>
+                  {onNavigate && hoveredId === note.id && (
+                    <button
+                      onClick={() => onNavigate(note.href)}
+                      style={{
+                        background: 'none',
+                        border: 'none',
+                        padding: 0,
+                        cursor: 'pointer',
+                        fontFamily: '"DM Sans", system-ui, sans-serif',
+                        fontSize: 11,
+                        color: '#8A7A6A',
+                        letterSpacing: '0.02em',
+                      }}
+                    >
+                      Read in context →
+                    </button>
+                  )}
+                </div>
               </div>
             ))}
           </div>

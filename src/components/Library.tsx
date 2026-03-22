@@ -434,7 +434,7 @@ function ContinueBanner({
           border: hovered && !opening
             ? '1px solid rgba(196,168,130,0.45)'
             : '1px solid rgba(26,25,23,0.08)',
-          background: '#FFFFFF',
+          background: 'var(--bg-surface)',
           cursor: opening ? 'default' : 'pointer',
           textAlign: 'left',
           font: 'inherit',
@@ -622,7 +622,7 @@ function BookCard({
         onMouseUp={() => setPressed(false)}
         style={{
           aspectRatio: '2/3',
-          borderRadius: 7,
+          borderRadius: 8,
           overflow: 'hidden',
           background: '#EAE7E1',
           position: 'relative',

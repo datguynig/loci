@@ -76,13 +76,20 @@ export default function Scratchpad({
                   background: 'none',
                   border: 'none',
                   color: 'var(--text-tertiary)',
-                  fontSize: 18,
                   cursor: 'pointer',
-                  lineHeight: 1,
-                  padding: 0,
+                  padding: 4,
+                  borderRadius: 4,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  transition: 'color 100ms ease',
                 }}
+                onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--text-secondary)' }}
+                onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--text-tertiary)' }}
               >
-                ×
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+                  <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+                </svg>
               </button>
             </div>
           </div>
