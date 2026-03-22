@@ -131,7 +131,7 @@ export default function Library({ supabase, onOpenBook, theme, onThemeToggle }: 
           fontFamily: '"Playfair Display", Georgia, serif',
           fontSize: 20,
           fontWeight: 700,
-          color: '#1A1917',
+          color: 'var(--text-primary)',
           letterSpacing: '-0.3px',
         }}>Loci</span>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
@@ -143,9 +143,9 @@ export default function Library({ supabase, onOpenBook, theme, onThemeToggle }: 
               display: 'inline-flex',
               alignItems: 'center',
               gap: 7,
-              background: isUploading ? 'rgba(26,25,23,0.04)' : 'transparent',
-              color: '#1A1917',
-              border: '1.5px solid rgba(26,25,23,0.22)',
+              background: isUploading ? 'var(--bg-secondary)' : 'transparent',
+              color: 'var(--text-primary)',
+              border: '1.5px solid var(--border)',
               borderRadius: 8,
               padding: '7px 14px',
               fontFamily: '"DM Sans", system-ui, sans-serif',
@@ -158,13 +158,13 @@ export default function Library({ supabase, onOpenBook, theme, onThemeToggle }: 
             }}
             onMouseEnter={(e) => {
               if (!isUploading) {
-                e.currentTarget.style.background = 'rgba(26,25,23,0.05)'
-                e.currentTarget.style.borderColor = 'rgba(26,25,23,0.4)'
+                e.currentTarget.style.background = 'var(--bg-secondary)'
+                e.currentTarget.style.borderColor = 'var(--text-tertiary)'
               }
             }}
             onMouseLeave={(e) => {
               e.currentTarget.style.background = 'transparent'
-              e.currentTarget.style.borderColor = 'rgba(26,25,23,0.22)'
+              e.currentTarget.style.borderColor = 'var(--border)'
             }}
           >
             {isUploading ? (
@@ -212,8 +212,8 @@ export default function Library({ supabase, onOpenBook, theme, onThemeToggle }: 
             <div style={{
               width: 28,
               height: 28,
-              border: '2px solid #E8E5DF',
-              borderTop: '2px solid #C4A882',
+              border: '2px solid var(--border)',
+              borderTop: '2px solid var(--accent-warm)',
               borderRadius: '50%',
               animation: 'spin 0.8s linear infinite',
             }} />
@@ -263,7 +263,7 @@ export default function Library({ supabase, onOpenBook, theme, onThemeToggle }: 
                     fontFamily: '"DM Sans", system-ui, sans-serif',
                     fontSize: 11,
                     fontWeight: 600,
-                    color: '#8A8680',
+                    color: 'var(--text-tertiary)',
                     letterSpacing: '0.08em',
                     textTransform: 'uppercase',
                   }}>
@@ -271,7 +271,7 @@ export default function Library({ supabase, onOpenBook, theme, onThemeToggle }: 
                   </span>
                   <span style={{
                     fontSize: 10,
-                    color: '#8A8680',
+                    color: 'var(--text-tertiary)',
                     transform: archivedOpen ? 'rotate(90deg)' : 'none',
                     transition: 'transform 180ms ease',
                     display: 'inline-block',
@@ -347,13 +347,13 @@ function EmptyState({
           fontFamily: '"Playfair Display", Georgia, serif',
           fontSize: 22,
           fontWeight: 600,
-          color: '#1A1917',
+          color: 'var(--text-primary)',
           margin: '0 0 6px',
         }}>Your library is empty</h2>
         <p style={{
           fontFamily: '"DM Sans", system-ui, sans-serif',
           fontSize: 14,
-          color: '#8A8680',
+          color: 'var(--text-secondary)',
           margin: 0,
         }}>Upload an EPUB to start reading</p>
       </div>
@@ -373,7 +373,7 @@ function EmptyState({
         <p style={{
           fontFamily: '"DM Sans", system-ui, sans-serif',
           fontSize: 13,
-          color: '#8A8680',
+          color: 'var(--text-tertiary)',
           margin: 0,
         }}>
           {isUploading ? 'Uploading…' : 'Drop an EPUB here, or click to browse'}
@@ -405,7 +405,7 @@ function ContinueBanner({
         fontFamily: '"DM Sans", system-ui, sans-serif',
         fontSize: 11,
         fontWeight: 600,
-        color: '#8A8680',
+        color: 'var(--text-tertiary)',
         letterSpacing: '0.1em',
         textTransform: 'uppercase',
         margin: '0 0 12px',
@@ -481,7 +481,7 @@ function ContinueBanner({
               fontFamily: '"Lora", Georgia, serif',
               fontSize: 15,
               fontWeight: 600,
-              color: '#1A1917',
+              color: 'var(--text-primary)',
               lineHeight: 1.35,
               display: '-webkit-box',
               WebkitLineClamp: 2,
@@ -494,7 +494,7 @@ function ContinueBanner({
                 fontFamily: '"DM Sans", system-ui, sans-serif',
                 fontSize: 12,
                 fontWeight: 500,
-                color: '#6B6560',
+                color: 'var(--text-secondary)',
                 lineHeight: 1.4,
                 display: '-webkit-box',
                 WebkitLineClamp: 1,
@@ -506,7 +506,7 @@ function ContinueBanner({
               <div style={{
                 fontFamily: '"DM Sans", system-ui, sans-serif',
                 fontSize: 11,
-                color: '#B0ADA8',
+                color: 'var(--text-tertiary)',
                 marginTop: 6,
                 letterSpacing: '0.02em',
               }}>
@@ -535,10 +535,10 @@ function ContinueBanner({
               width: 28,
               height: 28,
               borderRadius: 7,
-              background: detailHovered ? 'rgba(26,25,23,0.07)' : 'rgba(26,25,23,0.04)',
-              border: '1px solid rgba(26,25,23,0.08)',
+              background: detailHovered ? 'var(--bg-secondary)' : 'transparent',
+              border: '1px solid var(--border)',
               cursor: 'pointer',
-              color: detailHovered ? '#1A1917' : '#8A8680',
+              color: detailHovered ? 'var(--text-primary)' : 'var(--text-tertiary)',
               transition: 'background 140ms ease, color 140ms ease',
               opacity: hovered || detailHovered ? 1 : 0.55,
             }}
@@ -575,7 +575,7 @@ function BookGrid({
           fontFamily: '"DM Sans", system-ui, sans-serif',
           fontSize: 11,
           fontWeight: 600,
-          color: '#8A8680',
+          color: 'var(--text-tertiary)',
           letterSpacing: '0.08em',
           textTransform: 'uppercase',
           margin: '0 0 14px',
@@ -628,7 +628,7 @@ function BookCard({
           aspectRatio: '2/3',
           borderRadius: 8,
           overflow: 'hidden',
-          background: '#EAE7E1',
+          background: 'var(--bg-secondary)',
           position: 'relative',
           boxShadow: hovered
             ? '0 6px 22px rgba(0,0,0,0.16), 0 1px 4px rgba(0,0,0,0.06)'
@@ -652,14 +652,14 @@ function BookCard({
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            background: 'linear-gradient(135deg, #EAE7E1 0%, #D8D4CD 100%)',
+            background: 'linear-gradient(135deg, var(--bg-secondary) 0%, var(--border) 100%)',
             padding: 10,
           }}>
             <span style={{
               fontFamily: '"Lora", Georgia, serif',
               fontSize: 11,
               fontWeight: 600,
-              color: '#8A8680',
+              color: 'var(--text-tertiary)',
               textAlign: 'center',
               lineHeight: 1.3,
             }}>{book.title}</span>
@@ -729,7 +729,7 @@ function BookCard({
           fontFamily: '"Lora", Georgia, serif',
           fontSize: 13,
           fontWeight: 600,
-          color: '#1A1917',
+          color: 'var(--text-primary)',
           lineHeight: 1.35,
           display: '-webkit-box',
           WebkitLineClamp: 2,
@@ -741,7 +741,7 @@ function BookCard({
             fontFamily: '"DM Sans", system-ui, sans-serif',
             fontSize: 11,
             fontWeight: 500,
-            color: '#8A8680',
+            color: 'var(--text-secondary)',
             marginTop: 4,
             lineHeight: 1.4,
             display: '-webkit-box',

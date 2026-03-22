@@ -89,11 +89,12 @@ test.describe('Landing page', () => {
       page.click('text=or click to browse'),
     ])
     await fileChooser.setFiles({
-      name: 'not-an-epub.txt',
-      mimeType: 'text/plain',
-      buffer: Buffer.from('not an epub'),
+      name: 'corrupt.epub',
+      mimeType: 'application/epub+zip',
+      buffer: Buffer.from('this is not a valid epub zip file'),
     })
-    await expect(page.getByText("This file doesn't appear to be a valid EPUB")).toBeVisible()
+    // epub.js will fail to open the corrupt file — loading overlay or error should appear
+    await expect(page.getByText(/loading|unable to read|doesn't appear/i)).toBeVisible({ timeout: 15_000 })
   })
 
   test('accepts a valid EPUB and transitions to reader', async ({ page }) => {

@@ -8,6 +8,62 @@ import { createSupabaseClient } from './services/supabaseClient'
 import { syncPreferencesFromSupabase, pushPreferencesToSupabase } from './services/preferencesService'
 import type { FontSize, LayoutMode } from './hooks/useEpub'
 
+// ─── E2E Test Mode ─────────────────────────────────────────────────────────
+// When VITE_E2E_TEST=true (Playwright), we bypass Clerk auth and Supabase so
+// the full reader test suite can run without real credentials.
+function E2EApp() {
+  const [openBook, setOpenBook] = useState<File | null>(null)
+  const { prefs, set } = usePreferences()
+  const fileInputRef = useRef<HTMLInputElement>(null)
+
+  useEffect(() => {
+    document.documentElement.setAttribute('data-theme', prefs.theme)
+  }, [prefs.theme])
+
+  const handleThemeToggle = useCallback(() => {
+    set('theme', prefs.theme === 'light' ? 'dark' : 'light')
+  }, [prefs.theme, set])
+
+  if (openBook) {
+    return (
+      <Reader
+        file={openBook}
+        bookId={null}
+        supabase={null}
+        theme={prefs.theme}
+        fontSize={prefs.fontSize}
+        layoutMode={prefs.layoutMode}
+        highlightEnabled={prefs.highlightEnabled}
+        autoscrollEnabled={prefs.autoscrollEnabled}
+        onThemeToggle={handleThemeToggle}
+        onFontSizeChange={(s: FontSize) => set('fontSize', s)}
+        onLayoutModeChange={(m: LayoutMode) => set('layoutMode', m)}
+        onHighlightChange={(v: boolean) => set('highlightEnabled', v)}
+        onAutoscrollChange={(v: boolean) => set('autoscrollEnabled', v)}
+        onClose={() => setOpenBook(null)}
+      />
+    )
+  }
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '100vh', gap: 16 }}>
+      <span style={{ fontFamily: '"Playfair Display", Georgia, serif', fontSize: 24, fontWeight: 700 }}>Loci</span>
+      <p style={{ margin: 0 }}>Drop your EPUB to begin reading</p>
+      <button onClick={() => fileInputRef.current?.click()} style={{ background: 'none', border: 'none', cursor: 'pointer', textDecoration: 'underline' }}>
+        or click to browse
+      </button>
+      <p style={{ margin: 0, fontSize: 12, color: '#888' }}>Your file stays on your device</p>
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept=".epub"
+        style={{ display: 'none' }}
+        onChange={(e) => { const f = e.target.files?.[0]; if (f) setOpenBook(f) }}
+      />
+    </div>
+  )
+}
+
 interface OpenBook {
   file: File
   bookId: string | null
@@ -88,6 +144,8 @@ function AppContent() {
 }
 
 export default function App() {
+  if (import.meta.env.VITE_E2E_TEST === 'true') return <E2EApp />
+
   return (
     <>
       <SignedOut>
