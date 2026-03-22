@@ -7,13 +7,16 @@ import { getBookFile, markLastRead, type Book } from '../services/bookService'
 import { loadProgress } from '../services/progressService'
 import { formatDuration } from '../utils/formatDuration'
 import BookDetailModal from './BookDetailModal'
+import ThemeToggle from './ThemeToggle'
 
 interface LibraryProps {
   supabase: SupabaseClient
   onOpenBook: (file: File, bookId?: string, studyOptions?: { panel?: 'scratchpad'; chapterHref?: string }) => void
+  theme: 'light' | 'dark'
+  onThemeToggle: () => void
 }
 
-export default function Library({ supabase, onOpenBook }: LibraryProps) {
+export default function Library({ supabase, onOpenBook, theme, onThemeToggle }: LibraryProps) {
   const { books, loading, uploadState, uploadError, upload, refresh } = useLibrary(supabase)
   const [detailBook, setDetailBook] = useState<Book | null>(null)
   const [openingId, setOpeningId] = useState<string | null>(null)
@@ -107,7 +110,7 @@ export default function Library({ supabase, onOpenBook }: LibraryProps) {
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      style={{ minHeight: '100vh', background: '#F8F7F4' }}
+      style={{ minHeight: '100vh', background: 'var(--bg-primary)' }}
     >
       <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
 
@@ -118,8 +121,8 @@ export default function Library({ supabase, onOpenBook }: LibraryProps) {
         justifyContent: 'space-between',
         padding: '0 32px',
         height: 60,
-        borderBottom: '1px solid rgba(0,0,0,0.07)',
-        background: '#FFFFFF',
+        borderBottom: '1px solid var(--border)',
+        background: 'var(--bg-surface)',
         position: 'sticky',
         top: 0,
         zIndex: 10,
@@ -175,6 +178,7 @@ export default function Library({ supabase, onOpenBook }: LibraryProps) {
               </>
             )}
           </button>
+          <ThemeToggle theme={theme} onToggle={onThemeToggle} />
           <UserButton />
         </div>
       </header>

@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { AnimatePresence } from 'framer-motion'
-import { SignedIn, SignedOut, SignIn, useAuth } from '@clerk/clerk-react'
+import { SignedIn, SignedOut, SignIn, useAuth, useUser } from '@clerk/clerk-react'
 import Library from './components/Library'
 import Reader from './components/Reader'
 import { usePreferences } from './hooks/usePreferences'
 import { createSupabaseClient } from './services/supabaseClient'
+import { syncPreferencesFromSupabase, pushPreferencesToSupabase } from './services/preferencesService'
 import type { FontSize, LayoutMode } from './hooks/useEpub'
 
 interface OpenBook {
@@ -17,6 +18,7 @@ function AppContent() {
   const [openBook, setOpenBook] = useState<OpenBook | null>(null)
   const { prefs, set } = usePreferences()
   const { getToken } = useAuth()
+  const { user } = useUser()
   const getTokenRef = useRef(getToken)
   getTokenRef.current = getToken
 
@@ -26,6 +28,24 @@ function AppContent() {
     () => createSupabaseClient(() => getTokenRef.current({ template: 'supabase' })),
     [], // eslint-disable-line react-hooks/exhaustive-deps
   )
+
+  // Sync preferences from Supabase on sign-in (once per session)
+  const syncedRef = useRef(false)
+  useEffect(() => {
+    if (!user || syncedRef.current) return
+    syncedRef.current = true
+    syncPreferencesFromSupabase(supabase).catch(console.error)
+  }, [user, supabase])
+
+  // Push preferences to Supabase whenever they change
+  const prefsRef = useRef(prefs)
+  useEffect(() => {
+    if (!user || !syncedRef.current) return
+    // Skip the initial mount — only push after the sync has completed
+    if (prefsRef.current === prefs) return
+    prefsRef.current = prefs
+    pushPreferencesToSupabase(supabase, user.id, prefs).catch(console.error)
+  }, [prefs, user, supabase])
 
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', prefs.theme)
@@ -42,7 +62,7 @@ function AppContent() {
   return (
     <AnimatePresence mode="wait">
       {!openBook ? (
-        <Library key="library" supabase={supabase} onOpenBook={handleOpenBook} />
+        <Library key="library" supabase={supabase} onOpenBook={handleOpenBook} theme={prefs.theme} onThemeToggle={handleThemeToggle} />
       ) : (
         <Reader
           key="reader"
