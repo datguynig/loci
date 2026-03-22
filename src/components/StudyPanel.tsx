@@ -17,6 +17,7 @@ interface StudyPanelProps {
   supabase: SupabaseClient
   onFlashcardsGenerated: (cards: { front: string; back: string }[], chapterHref: string) => void
   chapterHref: string
+  chapterTitle?: string
   reviewMode?: { chapterHref: string }
   reviewFlashcards?: import('../services/flashcardService').Flashcard[]
   onMarkReviewed?: (id: string) => void
@@ -360,6 +361,7 @@ export default function StudyPanel({
   supabase,
   onFlashcardsGenerated,
   chapterHref,
+  chapterTitle,
   reviewMode,
   reviewFlashcards,
   onMarkReviewed,
@@ -600,7 +602,7 @@ export default function StudyPanel({
   const hasNotes = context.chapterNotes.length > 0
   const hasFlashcards = context.flashcards.length > 0
   const chips = computeChips(context, hasNotes, hasFlashcards, quizState.active)
-  const chapterName = extractChapterName(chapterHref)
+  const chapterName = chapterTitle || extractChapterName(chapterHref)
   const answered = quizState.answered
   const total = quizState.total
 
@@ -813,17 +815,32 @@ export default function StudyPanel({
 
           {/* Smart chips (hidden during active quiz) */}
           {chips.length > 0 && (
-            <div style={{ padding: '8px 12px 4px', display: 'flex', flexWrap: 'wrap', gap: 6, flexShrink: 0 }}>
-              {chips.map((chip) => (
-                <button
-                  key={chip}
-                  onClick={() => handleSend(chip)}
-                  disabled={streaming}
-                  style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border)', borderRadius: 20, padding: '4px 10px', fontFamily: '"DM Sans", system-ui, sans-serif', fontSize: 11, color: 'var(--text-secondary)', cursor: streaming ? 'default' : 'pointer', opacity: streaming ? 0.5 : 1 }}
-                >
-                  {chip}
-                </button>
-              ))}
+            <div style={{ padding: '8px 12px 4px', flexShrink: 0 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: chips.length === 1 ? '1fr' : '1fr 1fr', gap: 6 }}>
+                {chips.map((chip, i) => (
+                  <button
+                    key={chip}
+                    onClick={() => handleSend(chip)}
+                    disabled={streaming}
+                    style={{
+                      gridColumn: chips.length % 2 !== 0 && i === chips.length - 1 ? '1 / -1' : undefined,
+                      background: 'var(--bg-secondary)',
+                      border: '1px solid var(--border)',
+                      borderRadius: 8,
+                      padding: '7px 14px',
+                      fontFamily: '"DM Sans", system-ui, sans-serif',
+                      fontSize: 12,
+                      fontWeight: 500,
+                      color: 'var(--text-secondary)',
+                      cursor: streaming ? 'default' : 'pointer',
+                      opacity: streaming ? 0.5 : 1,
+                      textAlign: 'center',
+                    }}
+                  >
+                    {chip}
+                  </button>
+                ))}
+              </div>
             </div>
           )}
 

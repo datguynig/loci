@@ -15,13 +15,75 @@ serve(async (req) => {
     // Parse request
     const { action, messages, context } = await req.json()
 
+    const quizLength: number = context.quizLength ?? 5
+    const retryQuestions: string[] | undefined = context.retryQuestions?.length ? context.retryQuestions : undefined
+
     // Build system prompt
-    const systemPrompt = `You are a study assistant helping a student understand and revise their reading material.
+    const systemPrompt = `You are an expert study assistant helping a student deeply understand their reading material.
 You have access to the current chapter text, the student's notes, their scratchpad, their saved highlights, and their flashcards.
 
-Be concise, clear, and pedagogically sound. When the user asks for flashcards, output them as a JSON array on a single line: [{"front":"...","back":"..."},...].
-When quizzing, ask one question at a time and wait for the answer before revealing the correct response.
+PEDAGOGICAL APPROACH:
+- For summaries: Start with a 1-2 sentence overview, then give 3-5 key points as bullet points. Be specific — name characters, events, and ideas from the text.
+- For explanations: Use analogies when concepts are abstract. Match depth to complexity.
+- For quizzes: Vary question types — test recall, comprehension, and inference. Prefer specific, targeted questions over vague ones.
+- After correct quiz answers: Reinforce why the answer is right with one concrete detail.
+- After wrong answers: Explain clearly and connect it to something else in the text.
+
+FLASHCARD OUTPUT RULE: When the user asks for flashcards, you MUST output ONLY a raw JSON array with no surrounding text, no markdown, no code fences — just the array itself on a single line:
+[{"front":"...","back":"..."},{"front":"...","back":"..."}]
+Do not write \`\`\`json or any other wrapper. The array must be the entire response.
+
 Never fabricate information not present in the provided text.`
+
+    // Action-specific instruction injected at the tail of the first user message
+    const retryNote = retryQuestions
+      ? `The student got these questions wrong and wants to retry them — quiz ONLY on these exact topics:\n${retryQuestions.map((q, i) => `${i + 1}. ${q}`).join('\n')}\n`
+      : ''
+
+    const actionInstruction =
+      action === 'quiz'
+        ? `\n\n[QUIZ INSTRUCTIONS: You are running a ${quizLength}-question quiz. ${retryNote}
+
+⚠️ CRITICAL RULE: After every student answer, you MUST give feedback AND the next question in the SAME response. You can NEVER stop after feedback alone. A response that contains only feedback is WRONG.
+
+EXACT FORMAT TO FOLLOW:
+
+Your very first response (before any student input):
+Question 1/${quizLength}: [your question here]
+
+After the student answers questions 1 through ${quizLength - 1}:
+✓ Correct. [one sentence of reinforcement]
+
+Question {n+1}/${quizLength}: [next question here]
+
+— OR if wrong —
+✗ Incorrect. The answer is: [correct answer]. [one sentence explanation]
+
+Question {n+1}/${quizLength}: [next question here]
+
+After the student answers question ${quizLength} (the final one):
+✓ Correct. [one sentence of reinforcement]
+
+Quiz complete. You scored {X}/${quizLength}. [one sentence of encouragement]
+
+— OR if wrong —
+✗ Incorrect. The answer is: [correct answer]. [one sentence explanation]
+
+Quiz complete. You scored {X}/${quizLength}. [one sentence of encouragement]
+
+WORKED EXAMPLE (3-question quiz):
+→ You output: Question 1/3: What color is the sky?
+→ Student: Blue
+→ You output: ✓ Correct. The sky appears blue due to Rayleigh scattering.\n\nQuestion 2/3: What is H₂O?
+→ Student: Water
+→ You output: ✓ Correct. H₂O is the chemical formula for water.\n\nQuestion 3/3: How many planets orbit our sun?
+→ Student: 8
+→ You output: ✓ Correct. There are 8 planets following Pluto's reclassification in 2006.\n\nQuiz complete. You scored 3/3. Perfect score — excellent work!
+
+Begin immediately with Question 1/${quizLength}:]`
+        : action === 'flashcards'
+          ? '\n\n[INSTRUCTION: Output ONLY a raw JSON array on a single line. No preamble, no prose, no markdown, no code fences — start with [ and end with ].]'
+          : ''
 
     // Build context string to append to first user message (or as a separate system context)
     const contextParts: string[] = []
@@ -50,7 +112,7 @@ Never fabricate information not present in the provided text.`
     // Build the augmented messages — prepend context to the first user message
     const augmentedMessages = messages.map((m: any, i: number) => {
       if (i === 0 && m.role === 'user' && contextBlock) {
-        return { ...m, content: `${contextBlock}\n\n---\n\n${m.content}` }
+        return { ...m, content: `${contextBlock}\n\n---\n\n${m.content}${actionInstruction}` }
       }
       return m
     })
@@ -83,7 +145,7 @@ async function handleAnthropic(systemPrompt: string, messages: any[]) {
       'content-type': 'application/json',
     },
     body: JSON.stringify({
-      model: 'claude-haiku-4-5-20251001',
+      model: 'claude-sonnet-4-6',
       max_tokens: 2048,
       system: systemPrompt,
       messages,
@@ -151,7 +213,7 @@ async function handleGoogle(systemPrompt: string, messages: any[]) {
   }))
 
   const response = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:streamGenerateContent?key=${apiKey}&alt=sse`,
+    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-pro:streamGenerateContent?key=${apiKey}&alt=sse`,
     {
       method: 'POST',
       headers: { 'content-type': 'application/json' },

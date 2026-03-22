@@ -71,6 +71,19 @@ const FONT_SIZES: Record<FontSize, string> = {
   xl: '23px',
 }
 
+function injectThemeOverride(doc: Document, theme: Theme) {
+  doc.getElementById('loci-dark-override')?.remove()
+  if (theme !== 'dark') return
+  const style = doc.createElement('style')
+  style.id = 'loci-dark-override'
+  style.textContent = [
+    'html, body { color: #F0EDE8 !important; background-color: #111110 !important; }',
+    'h1, h2, h3, h4, h5, h6, p, span, td, th, li, blockquote { color: #F0EDE8 !important; }',
+    'a { color: #C4A882 !important; }',
+  ].join('\n')
+  doc.head.appendChild(style)
+}
+
 function getThemeStyles(
   theme: Theme,
   fontSize: FontSize,
@@ -283,6 +296,10 @@ export function useEpub({ fontSize, theme, layoutMode, highlightEnabled = true, 
 
   const applyTheme = useCallback((nextRendition: Rendition, currentTheme: Theme, currentFontSize: FontSize) => {
     nextRendition.themes.default(getThemeStyles(currentTheme, currentFontSize, layoutModeRef.current))
+    // Force theme colors with !important to override any EPUB-internal CSS
+    try {
+      nextRendition.getContents().forEach((c) => injectThemeOverride(c.document, currentTheme))
+    } catch { /* rendition may have no contents yet */ }
   }, [])
 
   const scrollReaderToTop = useCallback(() => {
@@ -783,6 +800,12 @@ export function useEpub({ fontSize, theme, layoutMode, highlightEnabled = true, 
     renditionRef.current = nextRendition
     setRendition(nextRendition)
     applyTheme(nextRendition, themeRef.current, fontSizeRef.current)
+
+    // Inject dark-mode color overrides after each chapter renders (overrides EPUB's own CSS)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    ;(nextRendition as any).hooks.content.register((contents: any) => {
+      injectThemeOverride(contents.document as Document, themeRef.current)
+    })
 
     nextRendition.on('rendered', () => {
       window.requestAnimationFrame(() => {
@@ -1369,18 +1392,33 @@ export function useEpub({ fontSize, theme, layoutMode, highlightEnabled = true, 
   const searchBook = useCallback(async (query: string): Promise<SearchResult[]> => {
     const b = bookRef.current
     if (!b || !query.trim()) return []
+
+    const results: SearchResult[] = []
     try {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const raw = await (b as any).search(query.trim())
-      return (raw ?? []).map((r: { cfi: string; excerpt: string }) => {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const spineItem = (b as any).spine?.get(r.cfi)
-        const href: string = spineItem?.href ?? ''
-        return { cfi: r.cfi, excerpt: r.excerpt, href }
-      })
+      const spine = (b as any).spine
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const sections: any[] = spine?.spineItems ?? []
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const loader = (b as any).load.bind(b)
+
+      for (const section of sections) {
+        try {
+          await section.load(loader)
+          const found: { cfi: string; excerpt: string }[] = section.find(query.trim()) ?? []
+          for (const r of found) {
+            results.push({ cfi: r.cfi, excerpt: r.excerpt, href: section.href ?? '' })
+          }
+          section.unload()
+        } catch {
+          // skip sections that fail to load or search
+        }
+      }
     } catch {
       return []
     }
+
+    return results
   }, [])
 
   const setOnTextSelected = useCallback(

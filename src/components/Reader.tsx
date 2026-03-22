@@ -142,6 +142,7 @@ export default function Reader({
     epub.currentHref,
     epub.progress,
     epub.goToHref,
+    studyOptions?.chapterHref,
   )
 
   // BUG-17: toast counter in ref, not module scope
@@ -248,6 +249,16 @@ export default function Reader({
   useEffect(() => {
     closeSelection()
   }, [currentHref])
+
+  // Human-readable chapter title for UI panels
+  const chapterTitle = useMemo(() => {
+    const norm = epub.currentHref.split('#')[0]
+    const entry = epub.toc.find((item) => {
+      const th = item.href.split('#')[0]
+      return th === norm || th.endsWith('/' + norm) || norm.endsWith('/' + th)
+    })
+    return entry?.label?.trim() ?? ''
+  }, [epub.currentHref, epub.toc])
 
   // Bookmark toggle for current chapter
   const isCurrentPageBookmarked = bookmarks.bookmarks.some(
@@ -898,18 +909,19 @@ export default function Reader({
               isOpen={studyPanelOpen}
               onClose={() => setStudyPanelOpen(false)}
               userId={userId}
+              bookId={bookId ?? ''}
               context={studyContext}
               supabase={supabase}
               chapterHref={currentHref ?? ''}
+              chapterTitle={chapterTitle}
               onFlashcardsGenerated={(cards, href) => flashcards.addFlashcards(href, cards)}
               reviewMode={studyOptions?.chapterHref ? { chapterHref: studyOptions.chapterHref } : undefined}
               reviewFlashcards={
                 studyOptions?.chapterHref
-                  ? flashcards.flashcards
-                      .filter(f => f.chapterHref === studyOptions.chapterHref)
-                      .map(f => ({ front: f.front, back: f.back }))
+                  ? flashcards.flashcards.filter(f => f.chapterHref === studyOptions.chapterHref)
                   : undefined
               }
+              onMarkReviewed={flashcards.markReviewed}
             />
           )}
         </AnimatePresence>
@@ -993,7 +1005,10 @@ export default function Reader({
               <button
                 onClick={() => {
                   if (chapterNoteText.trim()) {
-                    addAnnotation(currentHref ?? '', '', chapterNoteText.trim(), 'chapter_note')
+                    const saved = addAnnotation(currentHref ?? '', '', chapterNoteText.trim(), 'chapter_note')
+                    if (supabase && bookId && user) {
+                      saveAnnotationToSupabase(supabase, user.id, bookId, saved).catch(console.error)
+                    }
                   }
                   setChapterNoteOpen(false)
                   setChapterNoteText('')
