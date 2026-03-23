@@ -326,3 +326,22 @@ These are editorial surfaces that should feel like physical paper regardless of 
 The epub content renders inside an `iframe` managed by epubjs. CSS injected into the iframe is separate from the shell UI. The `--font-reading`, `--bg-primary`, and `--text-primary` variables are injected into the iframe document at load time so the reading experience respects the current theme.
 
 **Never apply shell UI styles inside the iframe** — they won't work and can conflict with epubjs pagination.
+
+---
+
+## Landing Page
+
+`src/components/Landing.tsx` is a **distinct surface** from the app shell. It is the marketing page shown to signed-out users and is entirely self-contained — it does not share sidebar, reader, or modal component patterns.
+
+**Inline styles are intentional here.** The landing page uses inline style objects throughout rather than shared component classes. This keeps it decoupled from the app shell and easier to iterate on independently.
+
+**Colour tokens still apply.** All colour usage follows the semantic token system (`var(--accent-warm)`, `var(--bg-primary)`, `var(--text-secondary)`, etc.). No hardcoded colour hex values are introduced — the dark mode rules from above hold here too.
+
+**Component-scoped CSS animations.** Two animations are defined inside a `<style>` tag within the component and are intentionally **not** extracted to `globals.css`, as they are only needed on this surface:
+
+| Animation | Class / usage | Behaviour |
+|---|---|---|
+| `blink` | Inline on `<span>` in `Cursor` component | 1s step-end infinite opacity toggle; simulates a typewriter cursor |
+| `waveform-bar` | `.waveform-bar` CSS class on `<div>` elements | Animates bar height for the audio waveform visualisation used in `SmallWaveform` and the hero narration section |
+
+If either animation is ever needed outside the landing page, move them to `globals.css` at that point.

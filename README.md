@@ -1,6 +1,6 @@
 # Loci
 
-Premium EPUB reader with cloud library, AI-powered text-to-speech, reading progress sync, and annotations.
+Premium EPUB reader with cloud library, AI narration, an AI study assistant (quizzes, summaries, flashcards), reading progress sync, and annotations.
 
 ## Features
 
@@ -12,6 +12,10 @@ Premium EPUB reader with cloud library, AI-powered text-to-speech, reading progr
 - **Book management** — cover extraction, ratings, reviews, archive/restore
 - **Reader settings** — theme (light/dark), font size (S/M/L/XL), layout, highlight on/off, autoscroll on/off
 - **Keyboard shortcuts** — page turns, theme toggle, sidebar, TTS playback
+- **AI study tools** — quiz me (scored, with retry), summaries, and flashcards powered by the AI study assistant; quiz attempts persisted to Supabase
+- **Marketing landing page** — signed-out users see a full landing page (hero, narration section, feature grid, pricing, FAQ) with sign-up/sign-in via Clerk
+- **Onboarding flow** — first-time users see a welcome screen with feature highlights before uploading their first book (dismissible; state stored in `localStorage` under `loci_onboarding_done`)
+- **Reader tour** — four-step in-reader tooltip tour shown on a user's first book open (dismissible; state stored in `localStorage` under `loci_reader_tour_seen`)
 
 ## Stack
 
@@ -45,6 +49,9 @@ VITE_SUPABASE_ANON_KEY=eyJ...
 
 # Optional — ElevenLabs premium TTS
 VITE_ELEVENLABS_PROXY_URL=https://your-proxy.example.com
+
+# Set to "true" to suppress first-run UI (onboarding, reader tour) during E2E tests
+VITE_E2E_TEST=false
 ```
 
 ### Supabase Setup
@@ -116,6 +123,26 @@ alter table public.preferences enable row level security;
 create policy "users own their preferences" on public.preferences
   for all using (auth.uid()::text = user_id::text);
 ```
+
+```sql
+-- Quiz sessions table
+create table public.quiz_sessions (
+  id           uuid primary key default gen_random_uuid(),
+  user_id      text not null,
+  book_id      uuid not null references public.books(id) on delete cascade,
+  chapter_href text,
+  score        int not null default 0,
+  total        int not null default 0,
+  questions    jsonb not null default '[]',
+  created_at   timestamptz default now()
+);
+alter table public.quiz_sessions enable row level security;
+create policy "Users manage own quiz sessions" on public.quiz_sessions
+  for all using ((auth.jwt() ->> 'sub') = user_id);
+create index quiz_sessions_user_book_idx on public.quiz_sessions(user_id, book_id);
+```
+
+> Migration files are also available in [`supabase/migrations/`](supabase/migrations/) if you prefer applying them via the Supabase CLI.
 
 Create two Storage buckets in your Supabase dashboard:
 - `books` — private (EPUB files)
