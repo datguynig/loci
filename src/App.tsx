@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { AnimatePresence } from 'framer-motion'
-import { SignedIn, SignedOut, SignIn, useAuth, useUser } from '@clerk/clerk-react'
+import { SignedIn, SignedOut, useAuth, useUser } from '@clerk/clerk-react'
 import Library from './components/Library'
 import Reader from './components/Reader'
+import Landing from './components/Landing'
 import { usePreferences } from './hooks/usePreferences'
 import { createSupabaseClient } from './services/supabaseClient'
 import { syncPreferencesFromSupabase, pushPreferencesToSupabase } from './services/preferencesService'
@@ -149,17 +150,7 @@ export default function App() {
   return (
     <>
       <SignedOut>
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            minHeight: '100vh',
-            background: '#F8F7F4',
-          }}
-        >
-          <SignIn routing="hash" />
-        </div>
+        <Landing />
       </SignedOut>
       <SignedIn>
         <AppContent />

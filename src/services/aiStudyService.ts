@@ -5,6 +5,9 @@ export interface StudyContext {
   annotations: { quote: string; note: string }[]
   flashcards: { front: string; back: string }[]
   selectedText: string | null
+  // Quiz-specific fields — omitted when not in a quiz
+  quizLength?: number
+  retryQuestions?: string[]
 }
 
 export interface Message {
@@ -54,12 +57,15 @@ export async function* sendStudyMessage(
 
   const reader = response.body!.getReader()
   const decoder = new TextDecoder()
+  let buffer = ''
 
   while (true) {
     const { done, value } = await reader.read()
     if (done) break
-    const chunk = decoder.decode(value, { stream: true })
-    const lines = chunk.split('\n')
+    buffer += decoder.decode(value, { stream: true })
+    // SSE lines are separated by \n; hold back the last partial line
+    const lines = buffer.split('\n')
+    buffer = lines.pop() ?? ''
     for (const line of lines) {
       if (line.startsWith('data: ')) {
         const payload = line.slice('data: '.length)

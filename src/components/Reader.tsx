@@ -23,6 +23,7 @@ import Toast, { type ToastMessage } from './Toast'
 import SelectionBubble from './SelectionBubble'
 import StudyPanel from './StudyPanel'
 import Scratchpad from './Scratchpad'
+import ReaderTour from './ReaderTour'
 import type { StudyContext } from '../services/aiStudyService'
 
 
@@ -90,6 +91,9 @@ export default function Reader({
   const [chapterNoteOpen, setChapterNoteOpen] = useState(false)
   const [chapterNoteText, setChapterNoteText] = useState('')
   const [toasts, setToasts] = useState<ToastMessage[]>([])
+  const [showTour, setShowTour] = useState(
+    () => import.meta.env.VITE_E2E_TEST !== 'true' && localStorage.getItem('loci_reader_tour_seen') !== 'true'
+  )
   const [selection, setSelection] = useState<{
     quote: string
     href: string
@@ -158,6 +162,11 @@ export default function Reader({
 
   const dismissToast = useCallback((id: string) => {
     setToasts((prev) => prev.filter((t) => t.id !== id))
+  }, [])
+
+  const handleTourDismiss = useCallback(() => {
+    localStorage.setItem('loci_reader_tour_seen', 'true')
+    setShowTour(false)
   }, [])
 
   // Load book on mount
@@ -1168,6 +1177,8 @@ export default function Reader({
 
       {/* Toast notifications */}
       <Toast messages={toasts} onDismiss={dismissToast} />
+
+      {showTour && <ReaderTour onDismiss={handleTourDismiss} />}
     </motion.div>
   )
 }

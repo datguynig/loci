@@ -1,4 +1,5 @@
 import { useState, useRef, useCallback, useEffect } from 'react'
+import OnboardingWelcome from './OnboardingWelcome'
 import { motion, AnimatePresence } from 'framer-motion'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { UserButton } from '@clerk/clerk-react'
@@ -19,6 +20,7 @@ interface LibraryProps {
 export default function Library({ supabase, onOpenBook, theme, onThemeToggle }: LibraryProps) {
   const { books, loading, uploadState, uploadError, upload, refresh } = useLibrary(supabase)
   const [detailBook, setDetailBook] = useState<Book | null>(null)
+  const [onboardingSkipped, setOnboardingSkipped] = useState(false)
   const [openingId, setOpeningId] = useState<string | null>(null)
   const [isDragging, setIsDragging] = useState(false)
   const [archivedOpen, setArchivedOpen] = useState(false)
@@ -219,12 +221,25 @@ export default function Library({ supabase, onOpenBook, theme, onThemeToggle }: 
             }} />
           </div>
         ) : books.length === 0 ? (
-          <EmptyState
-            dragProps={dragProps}
-            isDragging={isDragging}
-            isUploading={isUploading}
-            onBrowse={() => fileInputRef.current?.click()}
-          />
+          (() => {
+            const showOnboarding = !onboardingSkipped && localStorage.getItem('loci_onboarding_done') !== 'true'
+            return showOnboarding ? (
+              <OnboardingWelcome
+                onUpload={(files) => handleFiles(files)}
+                onSkip={() => {
+                  localStorage.setItem('loci_onboarding_done', 'true')
+                  setOnboardingSkipped(true)
+                }}
+              />
+            ) : (
+              <EmptyState
+                dragProps={dragProps}
+                isDragging={isDragging}
+                isUploading={isUploading}
+                onBrowse={() => fileInputRef.current?.click()}
+              />
+            )
+          })()
         ) : (
           <>
             {continueBook && (

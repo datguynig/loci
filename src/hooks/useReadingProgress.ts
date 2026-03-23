@@ -11,6 +11,7 @@ export function useReadingProgress(
   currentHref: string,
   progress: number,
   onRestoreHref: (href: string) => void,
+  preferredHref?: string,
 ) {
   const { user } = useUser()
   const restoredRef = useRef(false)
@@ -31,7 +32,8 @@ export function useReadingProgress(
     restoredRef.current = true
     sessionStartRef.current = Date.now()
     loadProgress(supabase, bookId).then((saved) => {
-      if (saved?.spineHref) onRestoreHrefRef.current(saved.spineHref)
+      const navTarget = preferredHref || saved?.spineHref
+      if (navTarget) onRestoreHrefRef.current(navTarget)
       savedSecondsRef.current = saved?.totalReadingSeconds ?? 0
     })
 

@@ -1,204 +1,997 @@
-import { useState, useRef, useCallback } from 'react'
-import { motion } from 'framer-motion'
+import { useState, useEffect, useRef } from 'react'
+import { motion, AnimatePresence } from 'framer-motion'
+import { useClerk } from '@clerk/clerk-react'
 
-interface LandingProps {
-  onFileSelected: (file: File) => void
+// ─── Hooks ────────────────────────────────────────────────────────────────────
+
+function useLoopingTypewriter(text: string, speed = 40, enabled = true) {
+  const [displayed, setDisplayed] = useState('')
+  const stateRef = useRef<{ index: number; resetting: boolean }>({ index: 0, resetting: false })
+
+  useEffect(() => {
+    if (!enabled) { setDisplayed(''); return }
+    stateRef.current = { index: 0, resetting: false }
+    setDisplayed('')
+    const interval = setInterval(() => {
+      const s = stateRef.current
+      if (s.resetting) return
+      if (s.index < text.length) {
+        s.index++
+        setDisplayed(text.slice(0, s.index))
+      } else {
+        s.resetting = true
+        setTimeout(() => { s.index = 0; s.resetting = false; setDisplayed('') }, 2800)
+      }
+    }, speed)
+    return () => clearInterval(interval)
+  }, [text, speed, enabled])
+
+  return displayed
 }
 
-export default function Landing({ onFileSelected }: LandingProps) {
-  const [isDragging, setIsDragging] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-  const fileInputRef = useRef<HTMLInputElement>(null)
-
-  const validateAndSelect = useCallback(
-    (file: File) => {
-      const isEpub =
-        file.name.toLowerCase().endsWith('.epub') ||
-        file.type === 'application/epub+zip'
-
-      if (!isEpub) {
-        setError("This file doesn't appear to be a valid EPUB")
-        setTimeout(() => setError(null), 4000)
-        return
-      }
-      onFileSelected(file)
-    },
-    [onFileSelected]
+function useTheme() {
+  const [theme, setTheme] = useState<'light' | 'dark'>(() =>
+    (document.documentElement.getAttribute('data-theme') as 'light' | 'dark') || 'light'
   )
-
-  const handleDrop = useCallback(
-    (e: React.DragEvent) => {
-      e.preventDefault()
-      setIsDragging(false)
-      const file = e.dataTransfer.files[0]
-      if (file) validateAndSelect(file)
-    },
-    [validateAndSelect]
-  )
-
-  const handleDragOver = (e: React.DragEvent) => {
-    e.preventDefault()
-    setIsDragging(true)
+  const toggle = () => {
+    const next = theme === 'light' ? 'dark' : 'light'
+    document.documentElement.setAttribute('data-theme', next)
+    setTheme(next)
   }
+  return { theme, toggle }
+}
 
-  const handleDragLeave = () => setIsDragging(false)
+function useWindowWidth() {
+  const [width, setWidth] = useState(typeof window !== 'undefined' ? window.innerWidth : 1200)
+  useEffect(() => {
+    const h = () => setWidth(window.innerWidth)
+    window.addEventListener('resize', h)
+    return () => window.removeEventListener('resize', h)
+  }, [])
+  return width
+}
 
-  const handleFileInput = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (file) validateAndSelect(file)
+// ─── Shared UI Atoms ──────────────────────────────────────────────────────────
+
+function Cursor() {
+  return (
+    <span style={{
+      display: 'inline-block', width: 1, height: '0.85em',
+      background: 'var(--accent-warm)', marginLeft: 1,
+      verticalAlign: 'text-bottom', animation: 'blink 1s step-end infinite',
+    }} />
+  )
+}
+
+function SmallWaveform({ color = 'var(--accent-warm)' }: { color?: string }) {
+  return (
+    <div style={{ display: 'flex', alignItems: 'flex-end', gap: 2, height: 14 }} aria-hidden="true">
+      {[0, 1, 2, 3, 4].map((i) => (
+        <div key={i} className="waveform-bar" style={{ animationDelay: `${i * 0.12}s`, background: color }} />
+      ))}
+    </div>
+  )
+}
+
+// ─── Hero Panels ──────────────────────────────────────────────────────────────
+
+type HeroTab = 'Read' | 'Listen' | 'Study'
+const HERO_TABS: HeroTab[] = ['Read', 'Listen', 'Study']
+
+function HeroReadPanel() {
+  const chapters = ['Ch. I', 'Ch. II', 'Ch. III', 'Ch. IV', 'Chapter V', 'Ch. VI']
+  return (
+    <div style={{ display: 'flex', height: '100%' }}>
+      <div style={{ width: 120, background: 'var(--bg-secondary)', borderRight: '1px solid var(--border)', padding: '12px 0', flexShrink: 0, overflow: 'hidden' }}>
+        {chapters.map((ch) => {
+          const active = ch === 'Chapter V'
+          return (
+            <div key={ch} style={{
+              padding: '5px 12px', fontFamily: 'var(--font-display)', fontSize: 11,
+              color: active ? 'var(--accent-warm)' : 'var(--text-tertiary)',
+              background: active ? 'rgba(196,168,130,0.22)' : 'transparent',
+              borderRadius: active ? 4 : 0, margin: active ? '0 6px' : 0,
+              whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+            }}>
+              {active ? `▶ ${ch}` : ch}
+            </div>
+          )
+        })}
+      </div>
+      <div style={{ flex: 1, padding: '28px 32px', background: 'var(--bg-surface)', overflow: 'hidden' }}>
+        <p style={{ fontFamily: 'var(--font-reading)', fontSize: 14, lineHeight: 1.9, color: 'var(--text-secondary)', margin: 0, textAlign: 'justify' }}>
+          It was on a dreary night of November that I beheld the accomplishment of my toils.{' '}
+          <span style={{ background: 'rgba(196,168,130,0.22)', borderRadius: 3, padding: '2px 2px', color: 'var(--text-primary)', boxShadow: '0 0 0 1.5px rgba(196,168,130,0.25)' }}>
+            I collected the instruments of life around me, that I might infuse a spark of being into the lifeless thing that lay at my feet.
+          </span>{' '}
+          It was already one in the morning; the rain pattered dismally against the panes, and my candle was nearly burnt out, when, by the glimmer of the half-extinguished light, I saw the dull yellow eye of the creature open...
+        </p>
+      </div>
+    </div>
+  )
+}
+
+function HeroListenPanel() {
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+      <div style={{ flex: 1, padding: '28px 32px', background: 'var(--bg-surface)', overflow: 'hidden' }}>
+        <p style={{ fontFamily: 'var(--font-reading)', fontSize: 14, lineHeight: 1.9, color: 'var(--text-secondary)', margin: 0, textAlign: 'justify' }}>
+          It was on a dreary night of November that I beheld the accomplishment of my toils. I collected the instruments of life around me,{' '}
+          <span style={{ background: 'rgba(196,168,130,0.22)', borderRadius: 3, padding: '2px 3px', color: 'var(--text-primary)', boxShadow: '0 0 0 2px rgba(196,168,130,0.22)' }}>
+            that I might infuse a spark of being into the lifeless thing
+          </span>{' '}
+          that lay at my feet. The rain pattered dismally against the panes...
+        </p>
+      </div>
+      <div style={{ background: 'var(--bg-secondary)', borderTop: '1px solid var(--border)' }}>
+        <div style={{ height: 22, padding: '4px 16px 0', overflow: 'hidden' }}>
+          <span style={{ fontFamily: 'var(--font-reading)', fontStyle: 'italic', fontSize: 11, color: 'var(--text-tertiary)' }}>
+            <span style={{ background: 'rgba(196,168,130,0.22)', padding: '1px 4px', borderRadius: 3, color: 'var(--text-secondary)' }}>
+              that I might infuse a spark of being into the lifeless thing
+            </span>
+          </span>
+        </div>
+        <div style={{ height: 52, display: 'flex', alignItems: 'center', padding: '0 16px', gap: 10 }}>
+          <span style={{ fontSize: 13, color: 'var(--text-tertiary)', cursor: 'default' }}>↩</span>
+          <div style={{ width: 32, height: 32, borderRadius: '50%', background: 'var(--accent-warm)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, boxShadow: '0 0 16px rgba(196,168,130,0.4)' }}>
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="white"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>
+          </div>
+          <span style={{ fontSize: 13, color: 'var(--text-tertiary)', cursor: 'default' }}>↪</span>
+          <SmallWaveform color="var(--accent-warm)" />
+          <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 8 }}>
+            <div style={{ display: 'flex', background: 'var(--bg-secondary)', borderRadius: 20, padding: 2, border: '1px solid var(--border)' }}>
+              {['Turbo', 'Quality'].map((m, i) => (
+                <span key={m} style={{ padding: '2px 8px', borderRadius: 16, fontSize: 10, fontFamily: 'var(--font-ui)', fontWeight: 500, background: i === 0 ? 'var(--accent-warm)' : 'transparent', color: i === 0 ? '#fff' : 'var(--text-tertiary)' }}>{m}</span>
+              ))}
+            </div>
+            <span style={{ fontFamily: 'var(--font-ui)', fontSize: 11, color: 'var(--text-secondary)', border: '1px solid var(--border)', borderRadius: 6, padding: '2px 7px', background: 'var(--bg-secondary)' }}>1×</span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 5, fontFamily: 'var(--font-ui)', fontSize: 11, color: 'var(--text-secondary)', border: '1px solid var(--border)', borderRadius: 6, padding: '2px 8px', background: 'var(--bg-secondary)' }}>
+              <span style={{ width: 7, height: 7, borderRadius: '50%', background: 'var(--accent-warm)', display: 'inline-block' }} />
+              Rachel
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+const STUDY_TEXT = "Chapter V is the pivot of the novel. Frankenstein succeeds, but his immediate revulsion reveals that the real horror is not the creature itself — it is what the act of creation says about him."
+
+function HeroStudyPanel() {
+  const text = useLoopingTypewriter(STUDY_TEXT, 34)
+  return (
+    <div style={{ display: 'flex', height: '100%' }}>
+      <div style={{ flex: 1, padding: '28px 24px', background: 'var(--bg-surface)', overflow: 'hidden' }}>
+        <p style={{ fontFamily: 'var(--font-reading)', fontSize: 13, lineHeight: 1.85, color: 'var(--text-secondary)', margin: 0, textAlign: 'justify' }}>
+          It was on a dreary night of November that I beheld the accomplishment of my toils with an anxiety that almost amounted to agony...
+        </p>
+      </div>
+      <div style={{ width: 220, background: 'var(--bg-secondary)', borderLeft: '1px solid var(--border)', padding: '16px 14px', flexShrink: 0, overflow: 'hidden' }}>
+        <div style={{ fontFamily: 'var(--font-ui)', fontSize: 11, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 10 }}>Study assistant</div>
+        <div style={{ display: 'flex', gap: 4, marginBottom: 12, flexWrap: 'wrap' }}>
+          {['Summarise', 'Quiz', '⚡'].map((chip, i) => (
+            <span key={chip} style={{ fontFamily: 'var(--font-ui)', fontSize: 10, padding: '3px 8px', borderRadius: 4, border: '1px solid var(--border)', background: i === 1 ? 'var(--accent-warm)' : 'var(--bg-primary)', color: i === 1 ? '#fff' : 'var(--text-secondary)' }}>{chip}</span>
+          ))}
+        </div>
+        <div style={{ fontFamily: 'var(--font-ui)', fontSize: 11, color: 'var(--text-secondary)', lineHeight: 1.65 }}>
+          <span style={{ color: 'var(--accent-warm)' }}>✦</span>{' '}{text}<Cursor />
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function HeroMockup({ rightPanel = false }: { rightPanel?: boolean }) {
+  const [activeTab, setActiveTab] = useState<HeroTab>('Read')
+  const [userClicked, setUserClicked] = useState(false)
+
+  useEffect(() => {
+    if (userClicked) return
+    const timer = setInterval(() => {
+      setActiveTab((prev) => HERO_TABS[(HERO_TABS.indexOf(prev) + 1) % HERO_TABS.length])
+    }, 3600)
+    return () => clearInterval(timer)
+  }, [userClicked])
+
+  const panels: Record<HeroTab, React.ReactNode> = {
+    Read: <HeroReadPanel />,
+    Listen: <HeroListenPanel />,
+    Study: <HeroStudyPanel />,
   }
 
   return (
     <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-      transition={{ duration: 0.18 }}
+      initial={rightPanel ? { opacity: 0, x: 40 } : { opacity: 0, y: 48 }}
+      animate={{ opacity: 1, x: 0, y: 0 }}
+      transition={rightPanel
+        ? { duration: 0.7, ease: [0.25, 0.46, 0.45, 0.94], delay: 0.5 }
+        : { type: 'spring', damping: 26, stiffness: 160, delay: 0.95 }
+      }
       style={{
-        minHeight: '100vh',
-        background: 'var(--bg-primary)',
-        display: 'flex',
-        flexDirection: 'column',
+        width: '100%',
+        maxWidth: rightPanel ? 'none' : 1100,
+        borderRadius: rightPanel ? '16px 0 0 16px' : '16px 16px 0 0',
+        overflow: 'hidden',
+        border: '1px solid rgba(196,168,130,0.19)',
+        ...(rightPanel ? { borderRight: 'none' } : { borderBottom: 'none' }),
+        boxShadow: rightPanel
+          ? '-24px 0 64px rgba(0,0,0,0.07), inset 0 1px 0 rgba(196,168,130,0.13)'
+          : '0 -32px 80px rgba(196,168,130,0.04), inset 0 1px 0 rgba(196,168,130,0.13)',
       }}
     >
-      {/* Wordmark */}
-      <header
-        style={{
-          padding: '28px 32px',
-          display: 'flex',
-          alignItems: 'center',
-        }}
-      >
-        <span
-          style={{
-            fontFamily: 'var(--font-display)',
-            fontSize: 22,
-            fontWeight: 500,
-            color: 'var(--text-primary)',
-            letterSpacing: '-0.02em',
-          }}
-        >
-          Loci
-        </span>
-      </header>
-
-      {/* Drop zone */}
-      <main
-        style={{
-          flex: 1,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          flexDirection: 'column',
-          gap: 16,
-          padding: '0 24px 80px',
-        }}
-      >
-        <motion.div
-          whileHover={{ scale: 1.01 }}
-          transition={{ duration: 0.12 }}
-          onDragOver={handleDragOver}
-          onDragLeave={handleDragLeave}
-          onDrop={handleDrop}
-          onClick={() => fileInputRef.current?.click()}
-          role="button"
-          tabIndex={0}
-          aria-label="Drop EPUB file here or click to browse"
-          onKeyDown={(e) => {
-            if (e.key === 'Enter' || e.key === ' ') fileInputRef.current?.click()
-          }}
-          style={{
-            width: 'min(400px, 100%)',
-            height: 280,
-            border: `2px dashed ${isDragging ? 'var(--accent-warm)' : 'var(--border)'}`,
-            borderRadius: 16,
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: 12,
-            cursor: 'pointer',
-            background: isDragging ? 'rgba(196,168,130,0.06)' : 'transparent',
-            transition: 'border-color 150ms ease, background 150ms ease',
-          }}
-        >
-          {/* Book icon */}
-          <svg
-            width="40"
-            height="40"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="var(--text-tertiary)"
-            strokeWidth="1.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
+      {/* Tab bar */}
+      <div style={{ background: 'var(--bg-secondary)', borderBottom: '1px solid var(--border)', height: 44, display: 'flex', alignItems: 'center', padding: '0 16px', justifyContent: 'space-between' }}>
+        <div style={{ display: 'flex', gap: 2 }}>
+          {HERO_TABS.map((tab) => (
+            <button
+              key={tab}
+              onClick={() => { setActiveTab(tab); setUserClicked(true) }}
+              style={{
+                fontFamily: 'var(--font-ui)', fontSize: 12,
+                fontWeight: activeTab === tab ? 600 : 400,
+                padding: '6px 16px', borderRadius: 6, border: 'none', cursor: 'pointer',
+                background: activeTab === tab ? 'rgba(196,168,130,0.22)' : 'transparent',
+                color: activeTab === tab ? 'var(--accent-warm)' : 'var(--text-tertiary)',
+                transition: 'all 150ms ease',
+              }}
+            >
+              {tab}
+            </button>
+          ))}
+        </div>
+        <span style={{ fontFamily: 'var(--font-ui)', fontSize: 11, color: 'var(--text-tertiary)' }}>Frankenstein — Ch. V</span>
+      </div>
+      {/* Content */}
+      <div style={{ height: rightPanel ? 580 : 320, position: 'relative', overflow: 'hidden' }}>
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={activeTab}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.18 }}
+            style={{ position: 'absolute', inset: 0 }}
           >
-            <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
-            <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
-          </svg>
+            {panels[activeTab]}
+          </motion.div>
+        </AnimatePresence>
+      </div>
+    </motion.div>
+  )
+}
 
-          <div style={{ textAlign: 'center' }}>
-            <p
-              style={{
-                fontFamily: 'var(--font-ui)',
-                fontSize: 14,
-                color: 'var(--text-secondary)',
-                margin: 0,
-              }}
-            >
-              Drop your EPUB to begin reading
-            </p>
-            <p
-              style={{
-                fontFamily: 'var(--font-ui)',
-                fontSize: 12,
-                color: 'var(--text-tertiary)',
-                marginTop: 4,
-                margin: '4px 0 0',
-              }}
-            >
-              or click to browse
-            </p>
+// ─── Feature Mockup: AI (quiz in progress) ────────────────────────────────────
+
+const QUIZ_TEXT = "The creature is described as having \"watery eyes\" and a \"shrivelled complexion.\" The contrast between Frankenstein's obsession and the grotesque result shows how desire distorts perception."
+
+function FeatureMockupAI() {
+  const text = useLoopingTypewriter(QUIZ_TEXT, 38)
+  return (
+    <div style={{ background: 'var(--bg-secondary)', borderRadius: 12, overflow: 'hidden', border: '1px solid var(--border)', marginTop: 24 }}>
+      <div style={{ padding: '12px 16px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <span style={{ fontFamily: 'var(--font-ui)', fontSize: 11, fontWeight: 600, color: 'var(--text-primary)' }}>Study assistant</span>
+        <div style={{ display: 'flex', gap: 4 }}>
+          {['Summarise', 'Quiz', '⚡'].map((chip, i) => (
+            <span key={chip} style={{ fontFamily: 'var(--font-ui)', fontSize: 10, padding: '3px 8px', borderRadius: 4, border: '1px solid var(--border)', background: i === 1 ? 'var(--accent-warm)' : 'var(--bg-surface)', color: i === 1 ? '#fff' : 'var(--text-secondary)' }}>{chip}</span>
+          ))}
+        </div>
+      </div>
+      <div style={{ padding: '12px 16px' }}>
+        <div style={{ fontFamily: 'var(--font-ui)', fontSize: 10, fontWeight: 600, color: 'var(--accent-warm)', marginBottom: 6 }}>Question 2 of 5</div>
+        <div style={{ fontFamily: 'var(--font-ui)', fontSize: 12, color: 'var(--text-primary)', lineHeight: 1.5, marginBottom: 10 }}>
+          How does Shelley describe the creature at the moment of creation?
+        </div>
+        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 6, marginBottom: 10 }}>
+          <span style={{ fontFamily: 'var(--font-ui)', fontSize: 10, color: 'var(--text-tertiary)', marginTop: 5, flexShrink: 0 }}>You</span>
+          <span style={{ fontFamily: 'var(--font-ui)', fontSize: 11, color: 'var(--text-secondary)', background: 'var(--bg-surface)', borderRadius: 6, padding: '5px 8px', flex: 1 }}>Ugly and deeply unsettling</span>
+        </div>
+        <div style={{ display: 'flex', gap: 6, alignItems: 'flex-start' }}>
+          <span style={{ color: 'var(--accent-warm)', fontSize: 12, flexShrink: 0 }}>✓</span>
+          <div style={{ fontFamily: 'var(--font-ui)', fontSize: 11, color: 'var(--text-secondary)', lineHeight: 1.6 }}>
+            {text}<Cursor />
           </div>
-        </motion.div>
+        </div>
+      </div>
+    </div>
+  )
+}
 
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept=".epub,application/epub+zip"
-          style={{ display: 'none' }}
-          onChange={handleFileInput}
-          aria-hidden="true"
-        />
+// ─── Why Loci ─────────────────────────────────────────────────────────────────
 
-        {/* Inline error */}
-        {error && (
-          <motion.p
-            initial={{ opacity: 0, y: 4 }}
-            animate={{ opacity: 1, y: 0 }}
-            style={{
-              fontFamily: 'var(--font-ui)',
-              fontSize: 13,
-              color: 'var(--accent-warm)',
-              margin: 0,
-            }}
-          >
-            {error}
-          </motion.p>
+const WHY_LOCI = [
+  {
+    n: '01',
+    title: 'The AI actually read your book.',
+    body: "Most AI tools need you to paste text in. Loci's AI has your chapter, your highlights, your notes, and your scratchpad already. Ask a question. Run a quiz. Generate flashcards. The context is already there.",
+  },
+  {
+    n: '02',
+    title: 'Narration good enough for a 4-hour commute.',
+    body: "Your browser's built-in voice sounds robotic. The voices in Loci are expressive and clear — comfortable for an entire audiobook. Each sentence is highlighted as it's spoken.",
+  },
+  {
+    n: '03',
+    title: 'Read, listen, study — in one place.',
+    body: 'No switching between your reader, your notes app, and your AI. Everything happens inside the book: highlights, notes, narration, quizzes, flashcards.',
+  },
+]
+
+// ─── FAQ ──────────────────────────────────────────────────────────────────────
+
+const FAQ_ITEMS = [
+  {
+    q: 'Is my library private?',
+    a: 'Yes. Your ebooks are stored on your device, not uploaded to our servers. The AI receives only the chapter you\'re currently reading.',
+  },
+  {
+    q: 'What formats does Loci support?',
+    a: 'EPUB only. Most ebooks from publishers and sources like Project Gutenberg are available in EPUB. Kindle files can be converted to EPUB using free tools like Calibre.',
+  },
+  {
+    q: 'How is Loci different from just using ChatGPT?',
+    a: "ChatGPT doesn't know what you're reading — you'd have to paste in chapter text every time. Loci's AI already has your chapter, your highlights, and your notes. It's built into the book.",
+  },
+  {
+    q: 'How does the AI narration work?',
+    a: 'Narration is included with every Pro subscription. Pick from multiple voices — one for speed, one for long sessions. No separate account required.',
+  },
+  {
+    q: 'What happens when the free trial ends?',
+    a: 'If you do not cancel before the 7-day trial ends, your subscription starts at $9/month. You can cancel anytime from your account settings — no waiting periods, no hoops.',
+  },
+]
+
+function FAQAccordion() {
+  const [openIndex, setOpenIndex] = useState<number | null>(null)
+  return (
+    <div style={{ maxWidth: 680, margin: '0 auto' }}>
+      {FAQ_ITEMS.map((item, i) => {
+        const isOpen = openIndex === i
+        return (
+          <div key={i} style={{ borderBottom: '1px solid var(--border)' }}>
+            <button
+              onClick={() => setOpenIndex(isOpen ? null : i)}
+              style={{ width: '100%', display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '18px 0', background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left', fontFamily: 'var(--font-ui)', fontSize: 15, fontWeight: 600, color: 'var(--text-primary)' }}
+            >
+              {item.q}
+              <motion.span
+                animate={{ rotate: isOpen ? 180 : 0 }}
+                transition={{ duration: 0.2 }}
+                style={{ color: 'var(--text-tertiary)', flexShrink: 0, marginLeft: 16, display: 'flex' }}
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <polyline points="6 9 12 15 18 9" />
+                </svg>
+              </motion.span>
+            </button>
+            <AnimatePresence initial={false}>
+              {isOpen && (
+                <motion.div
+                  initial={{ height: 0, opacity: 0 }}
+                  animate={{ height: 'auto', opacity: 1 }}
+                  exit={{ height: 0, opacity: 0 }}
+                  transition={{ duration: 0.22, ease: 'easeOut' }}
+                  style={{ overflow: 'hidden' }}
+                >
+                  <p style={{ fontFamily: 'var(--font-ui)', fontSize: 14, color: 'var(--text-secondary)', lineHeight: 1.7, margin: '0 0 18px', paddingRight: 32 }}>
+                    {item.a}
+                  </p>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
+// ─── Main Landing ─────────────────────────────────────────────────────────────
+
+export default function Landing() {
+  const { openSignIn, openSignUp } = useClerk()
+  const { theme, toggle: toggleTheme } = useTheme()
+  const windowWidth = useWindowWidth()
+  const isMobile = windowWidth < 768
+
+  // Navigation background adapts to theme
+  const navBg = theme === 'dark' ? 'rgba(17,17,16,0.92)' : 'rgba(248,247,244,0.92)'
+
+  const scrollTo = (id: string) => {
+    document.getElementById(id)?.scrollIntoView({ behavior: 'smooth' })
+  }
+
+  // Shared scroll-reveal config
+  const inView = {
+    initial: { opacity: 0, y: 32 },
+    whileInView: { opacity: 1, y: 0 },
+    viewport: { once: true, margin: '-80px' } as const,
+    transition: { duration: 0.55, ease: [0.25, 0.46, 0.45, 0.94] as [number, number, number, number] },
+  }
+
+  const labelStyle: React.CSSProperties = {
+    fontFamily: 'var(--font-ui)', fontSize: 11, letterSpacing: '0.12em',
+    color: 'var(--accent-warm)', marginBottom: 12, display: 'block', textTransform: 'uppercase',
+  }
+
+  const h2Style: React.CSSProperties = {
+    fontFamily: 'var(--font-display)', fontSize: isMobile ? 28 : 38,
+    color: 'var(--text-primary)', lineHeight: 1.15, margin: '12px 0 16px', fontWeight: 600,
+  }
+
+  const bodyStyle: React.CSSProperties = {
+    fontFamily: 'var(--font-ui)', fontSize: 15, color: 'var(--text-secondary)',
+    lineHeight: 1.7, marginBottom: 0,
+  }
+
+  // Voice personas for ElevenLabs section
+  const voices = [
+    { name: 'Rachel', desc: 'Warm & Clear', initial: 'R', hue: '#C4A882' },
+    { name: 'Adam', desc: 'Deep & Authoritative', initial: 'A', hue: '#7A9E8E' },
+    { name: 'Bella', desc: 'Bright & Expressive', initial: 'B', hue: '#9B8EC4' },
+    { name: 'Antoni', desc: 'Calm & Natural', initial: 'An', hue: '#C4957A' },
+  ]
+
+  return (
+    <div style={{ background: 'var(--bg-primary)', minHeight: '100vh' }}>
+      <style>{`
+        @keyframes blink { 0%,100% { opacity: 1; } 50% { opacity: 0; } }
+        html { scroll-behavior: smooth; }
+        .landing-hero-grid {
+          background-image: radial-gradient(var(--border) 1px, transparent 1px);
+          background-size: 28px 28px;
+        }
+      `}</style>
+
+      {/* ── 1. Nav ──────────────────────────────────────────────────────────── */}
+      <nav style={{ position: 'fixed', top: 0, left: 0, right: 0, zIndex: 100, height: 56, background: navBg, backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)', borderBottom: '1px solid var(--border)', display: 'grid', gridTemplateColumns: '1fr auto 1fr', alignItems: 'center', padding: '0 32px' }}>
+        <span style={{ fontFamily: 'var(--font-display)', fontSize: 18, fontWeight: 600, color: 'var(--text-primary)' }}>Loci</span>
+
+        {!isMobile && (
+          <div style={{ display: 'flex', gap: 32 }}>
+            {[['How it works', 'how-it-works'], ['Pricing', 'pricing'], ['FAQ', 'faq']].map(([label, id]) => (
+              <button key={id} onClick={() => scrollTo(id)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'var(--font-ui)', fontSize: 13, color: 'var(--text-secondary)', padding: '4px 0', transition: 'color 150ms' }}
+                onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--text-primary)' }}
+                onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--text-tertiary)' }}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
         )}
 
-        <p
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, justifyContent: 'flex-end' }}>
+          <button onClick={toggleTheme} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '6px 8px', borderRadius: 6, color: 'var(--text-tertiary)', display: 'flex', alignItems: 'center' }} title="Toggle theme">
+            {theme === 'dark'
+              ? <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
+              : <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+            }
+          </button>
+          <button onClick={() => openSignIn()} style={{ background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'var(--font-ui)', fontSize: 13, color: 'var(--text-tertiary)', padding: '6px 12px' }}>Sign in</button>
+          <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }} onClick={() => openSignUp()}
+            style={{ background: 'var(--text-primary)', color: 'var(--bg-primary)', fontFamily: 'var(--font-ui)', fontSize: 13, fontWeight: 600, padding: '8px 18px', borderRadius: 8, border: 'none', cursor: 'pointer' }}>
+            Start free trial
+          </motion.button>
+        </div>
+      </nav>
+
+      {/* ── 2. Hero ─────────────────────────────────────────────────────────── */}
+      {isMobile ? (
+        /* Mobile: centered, stacked */
+        <section className="landing-hero-grid" style={{ background: 'var(--bg-primary)', minHeight: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', overflow: 'hidden', paddingTop: 56 }}>
+          <div style={{ textAlign: 'center', padding: '72px 28px 48px', maxWidth: 560, margin: '0 auto' }}>
+            <motion.h1
+              initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.6, ease: [0.25, 0.46, 0.45, 0.94] }}
+              style={{ fontFamily: 'var(--font-display)', fontSize: 48, fontWeight: 600, color: 'var(--text-primary)', lineHeight: 1.0, margin: '0 0 20px', letterSpacing: '-0.025em' }}
+            >
+              Read, listen & learn from any book you own.
+            </motion.h1>
+            <motion.p
+              initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.3, duration: 0.5 }}
+              style={{ fontFamily: 'var(--font-ui)', fontSize: 16, color: 'var(--text-secondary)', margin: '0 auto 36px', lineHeight: 1.65, maxWidth: 340 }}
+            >
+              Narration that sounds human. A study assistant that's already read the book.
+            </motion.p>
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.45, duration: 0.4 }} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12 }}>
+              <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }} onClick={() => openSignUp()}
+                style={{ background: 'var(--text-primary)', color: 'var(--bg-primary)', fontFamily: 'var(--font-display)', fontStyle: 'italic', fontSize: 16, padding: '14px 36px', borderRadius: 12, border: 'none', cursor: 'pointer' }}>
+                Start 7-day free trial
+              </motion.button>
+              <span style={{ fontFamily: 'var(--font-ui)', fontSize: 12, color: 'var(--text-tertiary)' }}>No credit card required</span>
+            </motion.div>
+          </div>
+          <div style={{ width: '100%', padding: '0 16px' }}>
+            <HeroMockup />
+          </div>
+        </section>
+      ) : (
+        /* Desktop: left/right split — text left, product right (bleeds to edge) */
+        <section
+          className="landing-hero-grid"
           style={{
-            fontFamily: 'var(--font-ui)',
-            fontSize: 11,
-            color: 'var(--text-tertiary)',
-            marginTop: 8,
-            textAlign: 'center',
+            background: 'var(--bg-primary)',
+            minHeight: '100vh',
+            display: 'grid',
+            gridTemplateColumns: '44% 56%',
+            overflow: 'hidden',
+            paddingTop: 56,
           }}
         >
-          Your file stays on your device. Nothing is uploaded.
-        </p>
-      </main>
-    </motion.div>
+          {/* Left: Content */}
+          <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', padding: '80px 56px 80px max(48px, 8vw)' }}>
+            <motion.h1
+              initial={{ opacity: 0, y: 24 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.65, ease: [0.25, 0.46, 0.45, 0.94] }}
+              style={{ fontFamily: 'var(--font-display)', fontSize: 'clamp(40px, 3.8vw, 62px)', fontWeight: 600, color: 'var(--text-primary)', lineHeight: 1.05, margin: '0 0 28px', letterSpacing: '-0.03em', textAlign: 'left' }}
+            >
+              Read, listen & learn<br />from any book<br />you own.
+            </motion.h1>
+
+            <motion.p
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.55, delay: 0.25 }}
+              style={{ fontFamily: 'var(--font-ui)', fontSize: 17, color: 'var(--text-secondary)', margin: '0 0 44px', lineHeight: 1.65, maxWidth: 340, textAlign: 'left' }}
+            >
+              Narration that sounds human. A study assistant that's already read the book.
+            </motion.p>
+
+            <motion.div
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.45, delay: 0.4 }}
+              style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 12 }}
+            >
+              <motion.button
+                whileHover={{ scale: 1.02, boxShadow: '0 0 0 3px rgba(196,168,130,0.22)' }}
+                whileTap={{ scale: 0.98 }}
+                onClick={() => openSignUp()}
+                style={{ background: 'var(--text-primary)', color: 'var(--bg-primary)', fontFamily: 'var(--font-display)', fontStyle: 'italic', fontSize: 16, padding: '14px 32px', borderRadius: 12, border: 'none', cursor: 'pointer', transition: 'box-shadow 200ms' }}
+              >
+                Start 7-day free trial
+              </motion.button>
+              <span style={{ fontFamily: 'var(--font-ui)', fontSize: 12, color: 'var(--text-tertiary)' }}>
+                No credit card required
+              </span>
+            </motion.div>
+          </div>
+
+          {/* Right: Product — anchored to top, bleeds to viewport edge */}
+          <div style={{
+            background: 'var(--bg-secondary)',
+            borderLeft: '1px solid var(--border)',
+            overflow: 'hidden',
+            display: 'flex',
+            alignItems: 'flex-start',
+            padding: '40px 0 0 32px',
+          }}>
+            <HeroMockup rightPanel />
+          </div>
+        </section>
+      )}
+
+      {/* ── 3. Trust Bar ────────────────────────────────────────────────────── */}
+      <div style={{ background: 'var(--bg-secondary)', borderBottom: '1px solid var(--border)', padding: '16px 24px' }}>
+        <div style={{ maxWidth: 760, margin: '0 auto', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: isMobile ? 20 : 56, flexWrap: 'wrap' }}>
+          {[
+            { icon: <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>, label: 'Any ebook, instantly listenable' },
+            { icon: <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>, label: 'AI narration' },
+            { icon: <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>, label: 'AI only sees the chapter you\'re reading' },
+          ].map(({ icon, label }) => (
+            <div key={label} style={{ display: 'flex', alignItems: 'center', gap: 7, color: 'var(--text-secondary)' }}>
+              {icon}
+              <span style={{ fontFamily: 'var(--font-ui)', fontSize: 12 }}>{label}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* ── 4. Problem ──────────────────────────────────────────────────────── */}
+      <section style={{ padding: isMobile ? '80px 24px' : '100px 24px', background: 'var(--bg-primary)' }}>
+        <div style={{ maxWidth: 1060, margin: '0 auto' }}>
+          <div style={{ display: isMobile ? 'flex' : 'grid', flexDirection: 'column', gridTemplateColumns: '1fr 1fr 1fr', gap: 40 }}>
+            {[
+              { label: 'THE STUDENT', text: "You have an exam in 3 days. You highlighted the entire textbook. You re-read your highlights and realise you don't understand any of it in context. You've been re-reading for hours and it isn't working." },
+              { label: 'THE PROFESSIONAL', text: "You read Atomic Habits in January. It's July. You just recommended it to a colleague and couldn't name a single specific technique from the book." },
+              { label: 'THE AVID READER', text: "Your Goodreads says 67 books read. Someone asks your opinion on one of them. You remember the cover and that you liked it." },
+            ].map((item, i) => (
+              <motion.div key={item.label} initial={{ opacity: 0, y: 28 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true, margin: '-60px' }} transition={{ duration: 0.55, delay: i * 0.14, ease: 'easeOut' }}>
+                <div style={{ fontFamily: 'var(--font-ui)', fontSize: 10, letterSpacing: '0.12em', color: 'var(--text-secondary)', marginBottom: 14, textTransform: 'uppercase' }}>{item.label}</div>
+                <p style={{ fontFamily: 'var(--font-reading)', fontStyle: 'italic', fontSize: 15, color: 'var(--text-secondary)', lineHeight: 1.8, borderLeft: '2px solid var(--accent-warm)', paddingLeft: 20, margin: 0 }}>
+                  "{item.text}"
+                </p>
+              </motion.div>
+            ))}
+          </div>
+          <motion.p {...inView} style={{ fontFamily: 'var(--font-ui)', fontSize: 16, fontWeight: 600, color: 'var(--text-primary)', textAlign: 'center', marginTop: 64 }}>
+            Your books aren't going to read themselves. With Loci, they do.
+          </motion.p>
+        </div>
+      </section>
+
+      {/* ── 5. ElevenLabs section ───────────────────────────────────────────── */}
+      <section style={{ background: 'var(--bg-secondary)', padding: isMobile ? '80px 0' : '100px 0', overflow: 'hidden' }}>
+        {/* Header */}
+        <div style={{ textAlign: 'center', padding: '0 24px', marginBottom: 48 }}>
+          <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true, margin: '-60px' }} transition={{ duration: 0.5 }}>
+            <span style={{ fontFamily: 'var(--font-ui)', fontSize: 11, letterSpacing: '0.12em', color: 'var(--accent-warm)', display: 'block', marginBottom: 16 }}>AI NARRATION</span>
+            <h2 style={{ fontFamily: 'var(--font-display)', fontSize: isMobile ? 32 : 52, fontWeight: 600, color: 'var(--text-primary)', lineHeight: 1.1, margin: '0 0 16px', letterSpacing: '-0.02em' }}>
+              Narration that sounds like a person,<br />not a machine.
+            </h2>
+            <p style={{ fontFamily: 'var(--font-ui)', fontSize: 16, color: 'var(--text-secondary)', maxWidth: 480, margin: '0 auto' }}>
+              Not the robotic read-aloud built into your browser. The voices are expressive, natural, and clear enough for a 4-hour listening session.
+            </p>
+          </motion.div>
+        </div>
+
+        {/* Currently reading preview */}
+        <motion.div initial={{ opacity: 0 }} whileInView={{ opacity: 1 }} viewport={{ once: true }} transition={{ duration: 0.6, delay: 0.1 }}
+          style={{ textAlign: 'center', padding: '0 24px', marginBottom: 40 }}>
+          <p style={{ fontFamily: 'var(--font-reading)', fontStyle: 'italic', fontSize: isMobile ? 14 : 17, color: 'var(--text-secondary)', maxWidth: 680, margin: '0 auto', lineHeight: 1.8 }}>
+            "For this I had deprived myself of rest and health. I had desired it with an ardour that far exceeded moderation;{' '}
+            <span style={{ background: 'rgba(196,168,130,0.22)', borderRadius: 3, padding: '2px 4px', color: 'var(--text-primary)', boxShadow: '0 0 0 1.5px rgba(196,168,130,0.31)' }}>
+              but now that I had finished, the beauty of the dream vanished.
+            </span>"
+          </p>
+        </motion.div>
+
+        {/* Wide waveform */}
+        <motion.div initial={{ opacity: 0, scaleX: 0.7 }} whileInView={{ opacity: 1, scaleX: 1 }} viewport={{ once: true }} transition={{ duration: 0.7, ease: 'easeOut' }}
+          style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'center', gap: 3, height: 64, padding: '0 24px', marginBottom: 64 }}>
+          {Array.from({ length: isMobile ? 32 : 64 }).map((_, i) => {
+            const heights = [0.4, 0.7, 1.0, 0.6, 0.85, 0.45, 0.9, 0.55, 0.75, 1.0, 0.5, 0.8]
+            const h = heights[i % heights.length]
+            return (
+              <div
+                key={i}
+                className="waveform-bar"
+                style={{
+                  width: 5,
+                  height: 64,
+                  borderRadius: 3,
+                  background: `rgba(196,168,130,${0.25 + h * 0.55})`,
+                  animationDelay: `${(i * 0.055) % 1.1}s`,
+                  animationDuration: `${0.7 + (i % 4) * 0.15}s`,
+                }}
+              />
+            )
+          })}
+        </motion.div>
+
+        {/* Voice persona cards */}
+        <div style={{ maxWidth: 880, margin: '0 auto', display: isMobile ? 'grid' : 'grid', gridTemplateColumns: isMobile ? '1fr 1fr' : 'repeat(4, 1fr)', gap: 14, padding: '0 24px', marginBottom: 52 }}>
+          {voices.map((v, i) => (
+            <motion.div key={v.name}
+              initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ duration: 0.45, delay: i * 0.08 }}
+              style={{ background: 'var(--bg-surface)', border: '1px solid var(--border)', borderRadius: 16, padding: '20px 16px', textAlign: 'center' }}
+            >
+              <div style={{
+                width: 52, height: 52, borderRadius: '50%',
+                background: `${v.hue}18`,
+                border: `1.5px solid ${v.hue}55`,
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                margin: '0 auto 12px',
+                fontFamily: 'var(--font-display)', fontSize: 17, color: v.hue,
+              }}>
+                {v.initial}
+              </div>
+              <div style={{ fontFamily: 'var(--font-ui)', fontSize: 13, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 3 }}>{v.name}</div>
+              <div style={{ fontFamily: 'var(--font-ui)', fontSize: 11, color: 'var(--text-tertiary)' }}>{v.desc}</div>
+            </motion.div>
+          ))}
+        </div>
+
+        {/* Feature bullets */}
+        <div style={{ display: 'flex', gap: isMobile ? 16 : 40, justifyContent: 'center', flexWrap: 'wrap', padding: '0 24px' }}>
+          {['Expressive AI narration', 'Each sentence highlighted as it\'s spoken', 'Multiple voices to choose from', 'Adjustable playback speed'].map((item) => (
+            <div key={item} style={{ display: 'flex', alignItems: 'center', gap: 7, fontFamily: 'var(--font-ui)', fontSize: 13, color: 'var(--text-secondary)' }}>
+              <span style={{ color: 'var(--accent-warm)', fontWeight: 700 }}>✓</span>
+              {item}
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* ── 6. Feature Bento Grid ──────────────────────────────────────────── */}
+      <section style={{ padding: isMobile ? '80px 24px' : '100px 24px', background: 'var(--bg-primary)' }}>
+        <motion.h2 {...inView} style={{ fontFamily: 'var(--font-display)', fontSize: isMobile ? 32 : 44, fontWeight: 600, color: 'var(--text-primary)', textAlign: 'center', margin: '0 0 12px' }}>
+          Read it. Hear it. Learn from it.
+        </motion.h2>
+        <motion.p {...inView} style={{ fontFamily: 'var(--font-ui)', fontSize: 16, color: 'var(--text-secondary)', textAlign: 'center', margin: '0 0 48px' }}>
+          Every tool works together inside the book — no switching apps, no losing your place.
+        </motion.p>
+
+        <div style={{
+          maxWidth: 1100, margin: '0 auto',
+          display: 'grid',
+          gridTemplateColumns: isMobile ? '1fr' : '7fr 5fr',
+          gridTemplateRows: 'auto auto',
+          gap: 16,
+        }}>
+          {/* AI Study — large card */}
+          <motion.div
+            initial={{ opacity: 0, y: 24 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true, margin: '-60px' }} transition={{ duration: 0.5 }}
+            style={{ background: 'var(--bg-surface)', border: '1px solid var(--border)', borderRadius: 20, padding: '32px 32px 0', overflow: 'hidden', gridRow: isMobile ? 'auto' : 'span 1' }}
+          >
+            <span style={labelStyle}>AI STUDY TOOLS</span>
+            <h3 style={{ fontFamily: 'var(--font-display)', fontSize: isMobile ? 22 : 28, fontWeight: 600, color: 'var(--text-primary)', lineHeight: 1.2, margin: '0 0 12px' }}>
+              The AI that actually read your book.
+            </h3>
+            <p style={{ ...bodyStyle, marginBottom: 0, maxWidth: 400 }}>
+              No copy-pasting. No context-switching. The AI knows which chapter you're on, what you've highlighted, and what's in your notes.
+            </p>
+            <FeatureMockupAI />
+          </motion.div>
+
+          {/* Highlights — smaller card */}
+          <motion.div
+            initial={{ opacity: 0, y: 24 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true, margin: '-60px' }} transition={{ duration: 0.5, delay: 0.08 }}
+            style={{ background: 'var(--bg-surface)', border: '1px solid var(--border)', borderRadius: 20, padding: 32, overflow: 'hidden' }}
+          >
+            <span style={labelStyle}>HIGHLIGHTS & NOTES</span>
+            <h3 style={{ fontFamily: 'var(--font-display)', fontSize: isMobile ? 22 : 24, fontWeight: 600, color: 'var(--text-primary)', lineHeight: 1.2, margin: '0 0 12px' }}>
+              Highlight anything. It's always yours.
+            </h3>
+            <p style={{ ...bodyStyle, maxWidth: 320 }}>
+              Select any passage to highlight or add a note. Export everything as plain text — your insights, always on your terms.
+            </p>
+            {/* Mini highlight illustration */}
+            <div style={{ marginTop: 24, background: 'var(--bg-secondary)', borderRadius: 12, padding: '16px 18px' }}>
+              <p style={{ fontFamily: 'var(--font-reading)', fontSize: 13, color: 'var(--text-secondary)', lineHeight: 1.8, margin: '0 0 14px' }}>
+                ...I collected{' '}
+                <span style={{ background: 'rgba(196,168,130,0.38)', borderRadius: 3, padding: '2px 1px', color: 'var(--text-primary)' }}>
+                  the instruments of life around me, that I might infuse a spark of being
+                </span>{' '}
+                into the lifeless thing...
+              </p>
+              <div style={{ background: 'rgba(196,168,130,0.08)', border: '1px solid rgba(196,168,130,0.18)', borderRadius: 8, padding: '10px 12px' }}>
+                <div style={{ fontFamily: 'var(--font-ui)', fontSize: 9, color: 'var(--accent-warm)', fontWeight: 600, marginBottom: 4, letterSpacing: '0.1em' }}>YOUR NOTE</div>
+                <div style={{ fontFamily: 'var(--font-ui)', fontSize: 11, color: 'var(--text-secondary)', lineHeight: 1.5 }}>Compare pg. 12 — same creation-as-violation imagery. Prometheus parallel?</div>
+              </div>
+            </div>
+          </motion.div>
+
+          {/* Reading Experience — left bottom */}
+          <motion.div
+            initial={{ opacity: 0, y: 24 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true, margin: '-60px' }} transition={{ duration: 0.5, delay: 0.12 }}
+            style={{ background: 'var(--bg-surface)', border: '1px solid var(--border)', borderRadius: 20, padding: 32, gridColumn: isMobile ? 'auto' : '2 / 3', gridRow: isMobile ? 'auto' : '2 / 3' }}
+          >
+            <span style={labelStyle}>READING EXPERIENCE</span>
+            <h3 style={{ fontFamily: 'var(--font-display)', fontSize: isMobile ? 22 : 24, fontWeight: 600, color: 'var(--text-primary)', lineHeight: 1.2, margin: '0 0 12px' }}>
+              Designed around the words, not the interface.
+            </h3>
+            <p style={{ ...bodyStyle, maxWidth: 320 }}>
+              Font size. Dark mode. Scroll or paginated. The interface stays out of the way.
+            </p>
+            {/* Mini settings illustration */}
+            <div style={{ marginTop: 20, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+              {[{ label: 'A−', active: false }, { label: 'A', active: true }, { label: 'A+', active: false }].map(({ label, active }) => (
+                <span key={label} style={{ fontFamily: 'var(--font-ui)', fontSize: 13, padding: '6px 12px', borderRadius: 6, border: `1px solid ${active ? 'var(--accent-warm)' : 'var(--border)'}`, color: active ? 'var(--accent-warm)' : 'var(--text-tertiary)', background: active ? 'rgba(196,168,130,0.1)' : 'var(--bg-secondary)' }}>{label}</span>
+              ))}
+              {[{ label: 'Scroll', active: true }, { label: 'Pages', active: false }].map(({ label, active }) => (
+                <span key={label} style={{ fontFamily: 'var(--font-ui)', fontSize: 13, padding: '6px 12px', borderRadius: 6, border: `1px solid ${active ? 'var(--accent-warm)' : 'var(--border)'}`, color: active ? 'var(--accent-warm)' : 'var(--text-tertiary)', background: active ? 'rgba(196,168,130,0.1)' : 'var(--bg-secondary)' }}>{label}</span>
+              ))}
+            </div>
+          </motion.div>
+
+          {/* Privacy card — right bottom */}
+          <motion.div
+            initial={{ opacity: 0, y: 24 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true, margin: '-60px' }} transition={{ duration: 0.5, delay: 0.16 }}
+            style={{ background: 'var(--bg-primary)', border: '1px solid var(--border)', borderRadius: 20, padding: 32, gridColumn: isMobile ? 'auto' : '1 / 2', gridRow: isMobile ? 'auto' : '2 / 3', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}
+          >
+            <div style={{ marginBottom: 20 }}>
+              <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="var(--accent-warm)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+                <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+              </svg>
+            </div>
+            <div style={{ fontFamily: 'var(--font-display)', fontSize: isMobile ? 40 : 52, fontWeight: 700, color: 'var(--text-primary)', lineHeight: 1, marginBottom: 10 }}>0 bytes</div>
+            <div style={{ fontFamily: 'var(--font-ui)', fontSize: 15, color: 'var(--text-secondary)', lineHeight: 1.6, maxWidth: 360 }}>
+              uploaded. Your books live on your device. The AI sees only the chapter you're on.
+            </div>
+          </motion.div>
+        </div>
+      </section>
+
+      {/* ── 7. How It Works ─────────────────────────────────────────────────── */}
+      <section id="how-it-works" style={{ padding: isMobile ? '80px 24px' : '100px 24px', background: 'var(--bg-secondary)' }}>
+        <div style={{ maxWidth: 820, margin: '0 auto' }}>
+          <motion.div {...inView} style={{ marginBottom: 64 }}>
+            <span style={labelStyle}>HOW IT WORKS</span>
+            <h2 style={h2Style}>From first page to first flashcard.</h2>
+          </motion.div>
+          {[
+            { n: '01', text: 'You drag your ebook into Loci. The book loads instantly. Your library never leaves your device.' },
+            { n: '02', text: 'You turn on narration. You pick a voice. It reads the chapter aloud while each sentence is highlighted in the text as it\'s spoken.' },
+            { n: '03', text: 'You finish the chapter. You tap "Quiz me." The AI — which has your chapter text, your highlights, and your notes — generates five targeted questions.' },
+            { n: '04', text: 'You get three right, two wrong. You retry the two you missed. The AI explains the correct answer using something specific from the chapter.' },
+            { n: '05', text: 'You tap "Flashcards." Eight cards appear immediately. Save them or export to your notes app.' },
+            { n: '06', text: 'Tomorrow, you actually remember what you read.' },
+          ].map((beat, i) => (
+            <motion.div
+              key={beat.n}
+              initial={{ opacity: 0, y: 16 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true, margin: '-40px' }}
+              transition={{ duration: 0.4, delay: i * 0.07 }}
+              style={{ display: 'grid', gridTemplateColumns: '52px 1fr', gap: 24, borderTop: '1px solid var(--border)', padding: '28px 0', alignItems: 'baseline' }}
+            >
+              <span style={{ fontFamily: 'var(--font-ui)', fontSize: 11, fontWeight: 700, color: 'var(--accent-warm)', letterSpacing: '0.08em' }}>{beat.n}</span>
+              <p style={{ fontFamily: 'var(--font-reading)', fontSize: isMobile ? 15 : 17, color: 'var(--text-primary)', lineHeight: 1.75, margin: 0 }}>
+                {i === 5 ? <strong style={{ color: 'var(--text-primary)', fontWeight: 600 }}>{beat.text}</strong> : beat.text}
+              </p>
+            </motion.div>
+          ))}
+        </div>
+      </section>
+
+      {/* ── 8. Why Loci ─────────────────────────────────────────────────────── */}
+      <section style={{ padding: isMobile ? '80px 24px' : '100px 24px', background: 'var(--bg-primary)' }}>
+        <div style={{ maxWidth: 1060, margin: '0 auto' }}>
+          <motion.div {...inView} style={{ marginBottom: 64 }}>
+            <span style={labelStyle}>WHY LOCI</span>
+            <h2 style={h2Style}>Three tools. One book. Zero switching.</h2>
+          </motion.div>
+          <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(3, 1fr)', gap: isMobile ? 40 : 56 }}>
+            {WHY_LOCI.map((item, i) => (
+              <motion.div
+                key={item.n}
+                initial={{ opacity: 0, y: 24 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true, margin: '-60px' }}
+                transition={{ duration: 0.5, delay: i * 0.12 }}
+              >
+                <div style={{ fontFamily: 'var(--font-display)', fontSize: 48, fontWeight: 700, color: 'var(--accent-warm)', lineHeight: 1, marginBottom: 20, opacity: 0.6 }}>{item.n}</div>
+                <h3 style={{ fontFamily: 'var(--font-display)', fontSize: 20, fontWeight: 600, color: 'var(--text-primary)', lineHeight: 1.3, margin: '0 0 14px' }}>{item.title}</h3>
+                <p style={{ fontFamily: 'var(--font-reading)', fontSize: 15, color: 'var(--text-secondary)', lineHeight: 1.8, margin: 0 }}>{item.body}</p>
+              </motion.div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ── 11. Pricing ──────────────────────────────────────────────────────── */}
+      <section id="pricing" style={{ padding: isMobile ? '80px 24px' : '100px 24px', background: 'var(--bg-secondary)', textAlign: 'center' }}>
+        <motion.div {...inView} style={{ marginBottom: 52 }}>
+          <span style={labelStyle}>PRICING</span>
+          <h2 style={{ ...h2Style, textAlign: 'center', margin: '12px 0 0' }}>Start free. Upgrade when you're ready.</h2>
+        </motion.div>
+        <div style={{ maxWidth: 820, margin: '0 auto', display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: 20, alignItems: 'start' }}>
+          {/* Free card */}
+          <motion.div
+            initial={{ opacity: 0, y: 24 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ duration: 0.5 }}
+            style={{ background: 'var(--bg-surface)', border: '1px solid var(--border)', borderRadius: 20, padding: isMobile ? '32px 24px' : '40px 36px', textAlign: 'left' }}
+          >
+            <div style={{ fontFamily: 'var(--font-ui)', fontSize: 11, letterSpacing: '0.1em', color: 'var(--text-tertiary)', fontWeight: 600, marginBottom: 16 }}>FREE</div>
+            <div style={{ display: 'flex', alignItems: 'flex-end', gap: 6, marginBottom: 6 }}>
+              <span style={{ fontFamily: 'var(--font-display)', fontSize: 52, fontWeight: 700, color: 'var(--text-primary)', lineHeight: 1 }}>$0</span>
+            </div>
+            <p style={{ fontFamily: 'var(--font-ui)', fontSize: 13, color: 'var(--text-tertiary)', margin: '0 0 28px' }}>No credit card. Ever.</p>
+            <ul style={{ listStyle: 'none', padding: 0, margin: '0 0 32px', display: 'flex', flexDirection: 'column', gap: 11 }}>
+              {[
+                'Unlimited ebook reading',
+                'Highlights and notes',
+                'Dark mode and font settings',
+              ].map((feature) => (
+                <li key={feature} style={{ fontFamily: 'var(--font-ui)', fontSize: 14, color: 'var(--text-secondary)', display: 'flex', alignItems: 'flex-start', gap: 10 }}>
+                  <span style={{ color: 'var(--accent-warm)', fontWeight: 700, flexShrink: 0 }}>✓</span>
+                  {feature}
+                </li>
+              ))}
+            </ul>
+            <motion.button whileHover={{ scale: 1.01 }} whileTap={{ scale: 0.98 }} onClick={() => openSignUp()}
+              style={{ background: 'transparent', color: 'var(--text-primary)', fontFamily: 'var(--font-ui)', fontSize: 14, fontWeight: 600, padding: '13px 24px', borderRadius: 10, border: '1.5px solid var(--border)', cursor: 'pointer', width: '100%' }}>
+              Start reading free
+            </motion.button>
+          </motion.div>
+
+          {/* Pro card */}
+          <motion.div
+            initial={{ opacity: 0, y: 24 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ duration: 0.5, delay: 0.1 }}
+            style={{ borderRadius: 22, padding: 2, background: 'linear-gradient(135deg, var(--accent-warm) 0%, transparent 60%)' }}
+          >
+            <div style={{ background: 'var(--bg-surface)', borderRadius: 20, padding: isMobile ? '32px 24px' : '40px 36px', textAlign: 'left' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+                <div style={{ fontFamily: 'var(--font-ui)', fontSize: 11, letterSpacing: '0.1em', color: 'var(--text-tertiary)', fontWeight: 600 }}>PRO</div>
+                <div style={{ fontFamily: 'var(--font-ui)', fontSize: 10, letterSpacing: '0.08em', color: 'var(--accent-warm)', fontWeight: 700, background: 'rgba(196,168,130,0.12)', border: '1px solid rgba(196,168,130,0.25)', borderRadius: 20, padding: '3px 10px' }}>7-DAY FREE TRIAL</div>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'flex-end', gap: 4, marginBottom: 6 }}>
+                <span style={{ fontFamily: 'var(--font-display)', fontSize: 20, color: 'var(--text-secondary)', marginBottom: 10 }}>$</span>
+                <span style={{ fontFamily: 'var(--font-display)', fontSize: 52, fontWeight: 700, color: 'var(--text-primary)', lineHeight: 1 }}>9</span>
+                <span style={{ fontFamily: 'var(--font-ui)', fontSize: 14, color: 'var(--text-secondary)', marginBottom: 8 }}>/month</span>
+              </div>
+              <p style={{ fontFamily: 'var(--font-ui)', fontSize: 13, color: 'var(--text-tertiary)', margin: '0 0 28px' }}>Everything in Free, plus:</p>
+              <ul style={{ listStyle: 'none', padding: 0, margin: '0 0 32px', display: 'flex', flexDirection: 'column', gap: 11 }}>
+                {[
+                  'AI narration — multiple voices',
+                  'AI study assistant (summaries, quizzes, flashcards)',
+                  'Export your highlights and notes as plain text',
+                ].map((feature) => (
+                  <li key={feature} style={{ fontFamily: 'var(--font-ui)', fontSize: 14, color: 'var(--text-secondary)', display: 'flex', alignItems: 'flex-start', gap: 10 }}>
+                    <span style={{ color: 'var(--accent-warm)', fontWeight: 700, flexShrink: 0 }}>✓</span>
+                    {feature}
+                  </li>
+                ))}
+              </ul>
+              <motion.button whileHover={{ scale: 1.02, boxShadow: '0 8px 24px rgba(0,0,0,0.15)' }} whileTap={{ scale: 0.98 }} onClick={() => openSignUp()}
+                style={{ background: 'var(--text-primary)', color: 'var(--bg-primary)', fontFamily: 'var(--font-display)', fontStyle: 'italic', fontSize: 16, padding: '15px 24px', borderRadius: 12, border: 'none', cursor: 'pointer', width: '100%', marginBottom: 10 }}>
+                Start 7-day free trial
+              </motion.button>
+              <p style={{ fontFamily: 'var(--font-ui)', fontSize: 12, color: 'var(--text-tertiary)', margin: 0, textAlign: 'center' }}>No credit card required · cancel anytime</p>
+            </div>
+          </motion.div>
+        </div>
+      </section>
+
+      {/* ── 12. FAQ ─────────────────────────────────────────────────────────── */}
+      <section id="faq" style={{ padding: isMobile ? '80px 24px' : '100px 24px', background: 'var(--bg-primary)' }}>
+        <motion.div {...inView} style={{ marginBottom: 56, textAlign: 'center' }}>
+          <span style={labelStyle}>FAQ</span>
+          <h2 style={{ ...h2Style, textAlign: 'center', margin: '12px 0 0' }}>Honest answers.</h2>
+        </motion.div>
+        <FAQAccordion />
+      </section>
+
+      {/* ── 13. Final CTA ────────────────────────────────────────────────────── */}
+      <section style={{ background: 'var(--bg-secondary)', padding: isMobile ? '100px 24px 120px' : '140px 24px 160px', textAlign: 'center', position: 'relative', overflow: 'hidden' }}>
+        {/* Background watermark */}
+        <div style={{
+          position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
+          fontFamily: 'var(--font-display)', fontSize: 'clamp(80px, 18vw, 220px)',
+          color: 'var(--text-primary)', opacity: 0.03, pointerEvents: 'none', userSelect: 'none' as const, lineHeight: 1, whiteSpace: 'nowrap' as const,
+        }}>
+          Listen.
+        </div>
+        <motion.div
+          initial={{ opacity: 0, y: 32 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true, margin: '-80px' }}
+          transition={{ duration: 0.6 }}
+          style={{ position: 'relative', zIndex: 1 }}
+        >
+          <h2 style={{ fontFamily: 'var(--font-display)', fontSize: isMobile ? 36 : 64, fontWeight: 600, color: 'var(--text-primary)', lineHeight: 1.05, margin: '0 auto 20px', letterSpacing: '-0.025em', maxWidth: 720 }}>
+            All those books in your library.<br />When are you going to listen to them?
+          </h2>
+          <p style={{ fontFamily: 'var(--font-ui)', fontSize: 17, color: 'var(--text-secondary)', margin: '0 auto 48px', maxWidth: 400, lineHeight: 1.65 }}>
+            Your next commute could be chapter one.
+          </p>
+          <motion.button whileHover={{ scale: 1.02, boxShadow: '0 0 0 3px rgba(196,168,130,0.22)' }} whileTap={{ scale: 0.98 }} onClick={() => openSignUp()}
+            style={{ background: 'var(--text-primary)', color: 'var(--bg-primary)', fontFamily: 'var(--font-display)', fontStyle: 'italic', fontSize: 18, padding: '18px 48px', borderRadius: 12, border: 'none', cursor: 'pointer', marginBottom: 20 }}>
+            Start 7-day free trial
+          </motion.button>
+          <p style={{ fontFamily: 'var(--font-ui)', fontSize: 12, color: 'var(--text-tertiary)', margin: '0 0 14px' }}>
+            No credit card required · Cancel anytime
+          </p>
+          <p style={{ fontFamily: 'var(--font-ui)', fontSize: 13, color: 'var(--text-tertiary)', margin: 0 }}>
+            Already have an account?{' '}
+            <span onClick={() => openSignIn()} style={{ color: 'var(--accent-warm)', cursor: 'pointer', textDecoration: 'underline' }}>Sign in</span>
+          </p>
+        </motion.div>
+      </section>
+
+      {/* ── 14. Footer ────────────────────────────────────────────────────────── */}
+      <footer style={{ borderTop: '1px solid var(--border)', background: 'var(--bg-primary)', padding: '28px 24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <span style={{ fontFamily: 'var(--font-display)', fontSize: 16, fontWeight: 600, color: 'var(--text-primary)' }}>Loci</span>
+          <span style={{ fontFamily: 'var(--font-ui)', fontSize: 12, color: 'var(--text-tertiary)' }}>© 2026</span>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 20 }}>
+          <a href="/privacy" style={{ fontFamily: 'var(--font-ui)', fontSize: 12, color: 'var(--text-tertiary)', textDecoration: 'none' }}
+            onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--text-secondary)' }}
+            onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--text-tertiary)' }}>
+            Privacy Policy
+          </a>
+          <a href="/terms" style={{ fontFamily: 'var(--font-ui)', fontSize: 12, color: 'var(--text-tertiary)', textDecoration: 'none' }}
+            onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--text-secondary)' }}
+            onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--text-tertiary)' }}>
+            Terms of Service
+          </a>
+          <button onClick={() => openSignIn()} style={{ background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'var(--font-ui)', fontSize: 12, color: 'var(--text-secondary)', padding: 0 }}>Sign in</button>
+        </div>
+      </footer>
+    </div>
   )
 }

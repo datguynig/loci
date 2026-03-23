@@ -43,13 +43,16 @@ export function useScratchpad(
     [supabase, userId, bookId],
   )
 
-  // Clear timer on unmount
+  // Flush any pending debounced save on unmount to avoid data loss
   useEffect(() => {
     return () => {
       if (timerRef.current !== null) {
         clearTimeout(timerRef.current)
+        timerRef.current = null
+        saveScratchpad(supabase, userId, bookId, contentRef.current).catch(() => {})
       }
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   return { content, setContent, saving }
