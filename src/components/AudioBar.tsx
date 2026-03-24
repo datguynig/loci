@@ -353,6 +353,7 @@ export default function AudioBar({
       {/* Mobile TTS settings sheet */}
       {isMobile && (
         <BottomSheet open={ttsSheetOpen} onClose={() => setTtsSheetOpen(false)} title="Narration">
+          <div style={{ maxHeight: '70vh', overflowY: 'auto' }}>
           {/* Speed */}
           <div style={{ padding: '12px 20px 4px' }}>
             <div style={{ fontFamily: 'var(--font-ui)', fontSize: 12, color: 'var(--text-tertiary)', marginBottom: 10 }}>Speed</div>
@@ -365,16 +366,39 @@ export default function AudioBar({
             </div>
           </div>
 
-          {/* Voice — ElevenLabs */}
+          {/* Voice — ElevenLabs: compact 2-column grid */}
           {HAS_ELEVENLABS && provider === 'elevenlabs' && elevenLabsVoices.length > 0 && (
             <div style={{ padding: '16px 20px 4px' }}>
               <div style={{ fontFamily: 'var(--font-ui)', fontSize: 12, color: 'var(--text-tertiary)', marginBottom: 10 }}>Voice</div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                {elevenLabsVoices.map((v) => (
-                  <button key={v.voice_id} onClick={() => setVoiceId(v.voice_id)} style={{ padding: '10px 12px', borderRadius: 8, border: '1px solid var(--border)', background: selectedVoiceId === v.voice_id ? 'rgba(196,168,130,0.12)' : 'transparent', color: selectedVoiceId === v.voice_id ? 'var(--accent-warm)' : 'var(--text-primary)', fontFamily: 'var(--font-ui)', fontSize: 15, cursor: 'pointer', textAlign: 'left', borderColor: selectedVoiceId === v.voice_id ? 'rgba(196,168,130,0.5)' : 'var(--border)' }}>
-                    {v.name}
-                  </button>
-                ))}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
+                {elevenLabsVoices.map((v) => {
+                  const isSelected = selectedVoiceId === v.voice_id
+                  // Strip " – descriptor" suffix for compact display
+                  const shortName = v.name.split(' – ')[0].split(' - ')[0]
+                  return (
+                    <button
+                      key={v.voice_id}
+                      onClick={() => setVoiceId(v.voice_id)}
+                      style={{
+                        padding: '8px 10px',
+                        borderRadius: 8,
+                        border: `1px solid ${isSelected ? 'rgba(196,168,130,0.5)' : 'var(--border)'}`,
+                        background: isSelected ? 'rgba(196,168,130,0.12)' : 'transparent',
+                        color: isSelected ? 'var(--accent-warm)' : 'var(--text-primary)',
+                        fontFamily: 'var(--font-ui)',
+                        fontSize: 13,
+                        fontWeight: isSelected ? 600 : 400,
+                        cursor: 'pointer',
+                        textAlign: 'left',
+                        whiteSpace: 'nowrap',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                      }}
+                    >
+                      {shortName}
+                    </button>
+                  )
+                })}
               </div>
             </div>
           )}
@@ -443,6 +467,7 @@ export default function AudioBar({
                 Font, layout & highlights
               </button>
             </div>
+          </div>
           </div>
         </BottomSheet>
       )}

@@ -1,0 +1,5 @@
+{
+  "rewrites": [
+    { "source": "/:path*/_kmeta/:file", "destination": "/miniapps-stub.js" }
+  ]
+}

@@ -931,38 +931,56 @@ export default function Reader({
                 flexShrink: 0,
               }}>
                 <span>Notes ({annotations.annotations.length})</span>
-                {annotations.annotations.length > 0 && (
-                  <div style={{ display: 'flex', gap: 4 }}>
-                    <button
-                      onClick={() => exportAnnotationsAsMarkdown(epub.title ?? 'Notes', annotations.annotations)}
-                      title="Export as Markdown"
-                      style={{
-                        background: 'none',
-                        border: '1px solid var(--border)',
-                        borderRadius: 5,
-                        padding: '3px 8px',
-                        fontFamily: 'var(--font-ui)',
-                        fontSize: 11,
-                        color: 'var(--text-secondary)',
-                        cursor: 'pointer',
-                      }}
-                    >↗ MD</button>
-                    <button
-                      onClick={() => exportAnnotationsAsJSON(epub.title ?? 'Notes', annotations.annotations)}
-                      title="Export as JSON"
-                      style={{
-                        background: 'none',
-                        border: '1px solid var(--border)',
-                        borderRadius: 5,
-                        padding: '3px 8px',
-                        fontFamily: 'var(--font-ui)',
-                        fontSize: 11,
-                        color: 'var(--text-secondary)',
-                        cursor: 'pointer',
-                      }}
-                    >↗ JSON</button>
-                  </div>
-                )}
+                <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+                  {annotations.annotations.length > 0 && (
+                    <>
+                      <button
+                        onClick={() => exportAnnotationsAsMarkdown(epub.title ?? 'Notes', annotations.annotations)}
+                        title="Export as Markdown"
+                        style={{
+                          background: 'none',
+                          border: '1px solid var(--border)',
+                          borderRadius: 5,
+                          padding: '3px 8px',
+                          fontFamily: 'var(--font-ui)',
+                          fontSize: 11,
+                          color: 'var(--text-secondary)',
+                          cursor: 'pointer',
+                        }}
+                      >↗ MD</button>
+                      <button
+                        onClick={() => exportAnnotationsAsJSON(epub.title ?? 'Notes', annotations.annotations)}
+                        title="Export as JSON"
+                        style={{
+                          background: 'none',
+                          border: '1px solid var(--border)',
+                          borderRadius: 5,
+                          padding: '3px 8px',
+                          fontFamily: 'var(--font-ui)',
+                          fontSize: 11,
+                          color: 'var(--text-secondary)',
+                          cursor: 'pointer',
+                        }}
+                      >↗ JSON</button>
+                    </>
+                  )}
+                  <button
+                    onClick={() => setNotesOpen(false)}
+                    aria-label="Close notes"
+                    style={{
+                      background: 'none',
+                      border: 'none',
+                      padding: '4px 6px',
+                      borderRadius: 4,
+                      color: 'var(--text-tertiary)',
+                      cursor: 'pointer',
+                      fontSize: 16,
+                      lineHeight: 1,
+                      display: 'flex',
+                      alignItems: 'center',
+                    }}
+                  >✕</button>
+                </div>
               </div>
               <div style={{ flex: 1, overflowY: 'auto', padding: '12px 16px' }}>
                 {annotations.annotations.length === 0 ? (
