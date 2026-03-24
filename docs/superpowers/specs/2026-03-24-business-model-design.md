@@ -131,6 +131,8 @@ Replace with:
 
 A discreet footnote — *"Loci uses advanced language models to power Practice Quizzes, Chapter Briefs, and Study Guide"* — is placed at the bottom of the pricing section in `Landing.tsx`, before the FAQ. This satisfies tech-savvy users without leading with AI in headlines.
 
+The primary ICP is **university and college students**. The Scholar pitch should speak directly to student pain: *"Turn your assigned reading into an audiobook, a summary, and a study guide — automatically."* The Scholar pricing card includes a line: *"Students: $9.99/mo with code STUDENT"*.
+
 ---
 
 ## Unit Economics
@@ -152,9 +154,21 @@ A discreet footnote — *"Loci uses advanced language models to power Practice Q
 ### Study tools (AI calls)
 ~$0.01–0.03 per call (Claude/Gemini via Supabase edge function). Negligible at early scale.
 
+### Student discount
+
+Scholar is offered at **$9.99/month or $79/year** for students — a 29% discount on the monthly price, applied via a Stripe coupon code (`STUDENT`). No verification infrastructure required at launch; students self-identify with the promo code. A `.edu` email domain check via Clerk can be added later for enforcement.
+
+The student price is deliberately set at $9.99 rather than $7.99 (Reader price) to:
+1. Stay under the $10 psychological threshold students respond to
+2. Avoid confusion with Reader — Scholar Student is clearly the better offer at a higher price
+3. Maintain better unit economics (~45–50% gross margin vs. ~25–30% at $7.99 for typical student usage)
+
+Students primarily use study tools (Quiz, Summary, Study Guide, Flashcards) rather than marathon narration, so their TTS API costs run lower than general audiobook listeners — the economics hold at $9.99.
+
 ### Competitive positioning
 - **Reader at $7.99/mo** — matches Audible Plus ($7.99/mo for catalog streaming). Loci works on *any EPUB you own*, not just Audible's catalog.
 - **Scholar at $13.99/mo** — below Audible Premium Plus ($14.95/mo). Adds study tools unavailable on Audible.
+- **Scholar Student at $9.99/mo** — below Spotify Student ($5.99 + Spotify's costs), Apple Music Student ($5.99). Directly targets university ICP.
 - **Annual plans** framed as "Save 2 months" — psychologically compelling, improves cash flow.
 
 ---
