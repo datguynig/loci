@@ -196,7 +196,8 @@ export default function Reader({
   }, [layoutMode])
 
   const { clearSentenceHighlight } = epub
-  const { stop: stopSpeech, speak: speakSpeech, pause: pauseSpeech, resume: resumeSpeech } = speech
+  const { stop: stopSpeech, speak: speakSpeech, pause: pauseSpeech, resume: resumeSpeech,
+          isPlaying: speechIsPlaying, isPaused: speechIsPaused } = speech
 
   const handleNextPage = useCallback(() => {
     stopSpeech()
@@ -239,13 +240,13 @@ export default function Reader({
   // TTS reading highlight — glow the paragraph being spoken
   const { highlightSentence } = epub
   useEffect(() => {
-    if (speech.isPlaying && !speech.isPaused) {
+    if (speechIsPlaying && !speechIsPaused) {
       const sentence = speech.sentences[speech.currentSentenceIndex]
       if (sentence) highlightSentence(sentence)
     } else {
       clearSentenceHighlight()
     }
-  }, [speech.currentSentenceIndex, speech.isPlaying, speech.isPaused, highlightSentence, clearSentenceHighlight])
+  }, [speech.currentSentenceIndex, speechIsPlaying, speechIsPaused, highlightSentence, clearSentenceHighlight])
 
   // Re-apply annotation underlines whenever the chapter changes
   const { applyAnnotationHighlights, setOnTextSelected, currentHref } = epub
@@ -339,23 +340,21 @@ export default function Reader({
         case '[': {
           const prevIdx = currentChapterIndex - 1
           if (prevIdx >= 0 && toc[prevIdx]) {
-            stopSpeech()
-            goToHref(toc[prevIdx].href)
+            handleNavigate(toc[prevIdx].href)
           }
           break
         }
         case ']': {
           const nextIdx = currentChapterIndex + 1
           if (toc[nextIdx]) {
-            stopSpeech()
-            goToHref(toc[nextIdx].href)
+            handleNavigate(toc[nextIdx].href)
           }
           break
         }
         case 'p':
         case 'P':
-          if (speech.isPlaying && !speech.isPaused) pauseSpeech()
-          else if (speech.isPaused) resumeSpeech()
+          if (speechIsPlaying && !speechIsPaused) pauseSpeech()
+          else if (speechIsPaused) resumeSpeech()
           else speakSpeech(getCurrentText())
           break
         case 's':
@@ -389,7 +388,7 @@ export default function Reader({
   }, [
     handleNextReadingStep,
     handlePrevReadingStep,
-    goToHref,
+    handleNavigate,
     toc,
     currentChapterIndex,
     getCurrentText,
@@ -397,8 +396,8 @@ export default function Reader({
     speakSpeech,
     pauseSpeech,
     resumeSpeech,
-    speech.isPlaying,
-    speech.isPaused,
+    speechIsPlaying,
+    speechIsPaused,
     fontSize,
     onThemeToggle,
     onFontSizeChange,
@@ -1165,11 +1164,11 @@ export default function Reader({
             addToast('No text found — try navigating to a different page')
             return
           }
-          speech.speak(text)
+          speakSpeech(text)
         }}
-        onPause={speech.pause}
-        onResume={speech.resume}
-        onStop={speech.stop}
+        onPause={pauseSpeech}
+        onResume={resumeSpeech}
+        onStop={stopSpeech}
         onSkipForward={speech.skipForward}
         onSkipBack={speech.skipBack}
         fontSize={fontSize}
