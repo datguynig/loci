@@ -76,6 +76,13 @@ export default function Reader({
   const handleContentClick = useCallback(() => {
     if (isMobile) setChromeVisible((v) => !v)
   }, [isMobile])
+
+  // Deferred — speech not yet initialised; wired below via ref to avoid ordering issue
+  const onParagraphClickRef = useRef<((text: string) => void) | undefined>(undefined)
+  const handleParagraphClick = useCallback((text: string) => {
+    onParagraphClickRef.current?.(text)
+  }, [])
+
   const epub = useEpub({
     fontSize,
     theme,
@@ -83,6 +90,7 @@ export default function Reader({
     highlightEnabled,
     autoscrollEnabled,
     onContentClick: handleContentClick,
+    onParagraphClick: handleParagraphClick,
   })
 
   // Cross-chapter TTS: when a chapter ends naturally, advance and resume
@@ -93,6 +101,17 @@ export default function Reader({
   }, [epub.nextChapter])
 
   const speech = useSpeech({ onEnded: handleTTSEnded })
+
+  // Wire paragraph-click → speakFromHint (after speech is available)
+  const { speakFromHint } = speech
+  useEffect(() => {
+    onParagraphClickRef.current = (text: string) => {
+      const fullText = epub.getCurrentText()
+      if (!fullText) return
+      speakFromHint(fullText, text)
+    }
+  }, [epub.getCurrentText, speakFromHint])
+
   const annotations = useAnnotations(epub.book?.key() ?? null)
   const bookmarks = useBookmarks(supabase, userId || null, bookId ?? null)
   const flashcards = useFlashcards(supabase as SupabaseClient, userId, bookId ?? '')

@@ -10,6 +10,8 @@ import { splitSentences, pickPreferredVoice, resolveTtsProvider, hasElevenLabs }
 
 export interface UseSpeechReturn {
   speak: (text: string) => void
+  /** Start (or jump) playback from the sentence nearest to `hint` within `fullText`. */
+  speakFromHint: (fullText: string, hint: string) => void
   pause: () => void
   resume: () => void
   stop: () => void
@@ -337,6 +339,47 @@ export function useSpeech(options?: { onEnded?: () => void }): UseSpeechReturn {
     }
   }, [provider, playElevenLabsSentence, playBrowserSentence])
 
+  const speakFromHint = useCallback(
+    (fullText: string, hint: string) => {
+      const parsed = splitSentences(fullText)
+      if (parsed.length === 0) return
+
+      // Find first sentence whose normalised text contains the beginning of the hint
+      const normHint = hint.replace(/\s+/g, ' ').toLowerCase().slice(0, 30)
+      let startIdx = parsed.findIndex((s) =>
+        s.replace(/\s+/g, ' ').toLowerCase().includes(normHint.slice(0, 20))
+      )
+      if (startIdx < 0) startIdx = 0
+
+      // Stop any current playback
+      isPlayingRef.current = false
+      currentAudioRef.current?.pause()
+      if (currentAudioRef.current) {
+        currentAudioRef.current.src = ''
+        currentAudioRef.current = null
+      }
+      window.speechSynthesis.cancel()
+      stopChromeBugFix()
+
+      sentencesRef.current = parsed
+      setSentences(parsed)
+      indexRef.current = startIdx
+      setCurrentSentenceIndex(startIdx)
+      setIsPlaying(true)
+      setIsPaused(false)
+      isPlayingRef.current = true
+      isPausedRef.current = false
+
+      if (provider === 'elevenlabs' && voiceIdRef.current) {
+        playElevenLabsSentence(startIdx)
+      } else {
+        startChromeBugFix()
+        playBrowserSentence(startIdx)
+      }
+    },
+    [provider, playElevenLabsSentence, playBrowserSentence, startChromeBugFix, stopChromeBugFix]
+  )
+
   // Cleanup on unmount
   useEffect(() => {
     return () => {
@@ -349,6 +392,7 @@ export function useSpeech(options?: { onEnded?: () => void }): UseSpeechReturn {
 
   return {
     speak,
+    speakFromHint,
     pause,
     resume,
     stop,

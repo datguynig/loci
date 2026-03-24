@@ -24,6 +24,8 @@ interface UseEpubOptions {
   autoscrollEnabled?: boolean
   /** Called when the user taps inside the epub content area (not on a link or selection). */
   onContentClick?: () => void
+  /** Called when the user taps a text block (p, li, heading…) — receives normalised paragraph text. */
+  onParagraphClick?: (text: string) => void
 }
 
 export interface SearchResult {
@@ -71,6 +73,17 @@ const FONT_SIZES: Record<FontSize, string> = {
   md: '18px',
   lg: '20px',
   xl: '23px',
+}
+
+/** Normalise Unicode typography so DOM text and TTS sentence text compare reliably. */
+function normalizeText(s: string): string {
+  return s
+    .replace(/[\u2018\u2019]/g, "'")  // smart single quotes
+    .replace(/[\u201C\u201D]/g, '"')  // smart double quotes
+    .replace(/\u2013|\u2014/g, '-')   // en/em dash
+    .replace(/\u00A0/g, ' ')          // non-breaking space
+    .replace(/\s+/g, ' ')
+    .trim()
 }
 
 function injectThemeOverride(doc: Document, theme: Theme) {
@@ -244,7 +257,7 @@ function buildRenditionOptions(layoutMode: LayoutMode) {
 }
 
 
-export function useEpub({ fontSize, theme, layoutMode, highlightEnabled = true, autoscrollEnabled = true, onContentClick }: UseEpubOptions): UseEpubReturn {
+export function useEpub({ fontSize, theme, layoutMode, highlightEnabled = true, autoscrollEnabled = true, onContentClick, onParagraphClick }: UseEpubOptions): UseEpubReturn {
   const [book, setBook] = useState<Book | null>(null)
   const [rendition, setRendition] = useState<Rendition | null>(null)
   const [toc, setToc] = useState<NavItem[]>([])
@@ -266,6 +279,8 @@ export function useEpub({ fontSize, theme, layoutMode, highlightEnabled = true, 
   const viewerRef = useRef<HTMLDivElement>(null)
   const onContentClickRef = useRef(onContentClick)
   onContentClickRef.current = onContentClick
+  const onParagraphClickRef = useRef(onParagraphClick)
+  onParagraphClickRef.current = onParagraphClick
   const bookRef = useRef<Book | null>(null)
   const renditionRef = useRef<Rendition | null>(null)
   const tocRef = useRef<NavItem[]>([])
@@ -816,7 +831,7 @@ export function useEpub({ fontSize, theme, layoutMode, highlightEnabled = true, 
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       ;(doc.defaultView as any).renderMiniapps = () => {}
 
-      // Forward taps on the epub content area so Reader can toggle chrome visibility
+      // Forward taps on the epub content area
       doc.addEventListener('click', (e) => {
         // Ignore taps on links and interactive elements
         const target = e.target as Element
@@ -824,6 +839,18 @@ export function useEpub({ fontSize, theme, layoutMode, highlightEnabled = true, 
         // Only fire when there is no active text selection
         const sel = doc.defaultView?.getSelection()
         if (sel && sel.toString().length > 0) return
+
+        // If the tap landed on a text block, fire onParagraphClick for TTS positioning
+        const block = target.closest('p, li, h1, h2, h3, h4, h5, h6, blockquote, td')
+        if (block) {
+          const text = normalizeText(block.textContent ?? '')
+          if (text.length > 3) {
+            onParagraphClickRef.current?.(text)
+            return  // don't also toggle chrome on text taps
+          }
+        }
+
+        // Whitespace / margin tap → toggle chrome visibility
         onContentClickRef.current?.()
       })
     })
@@ -1346,12 +1373,12 @@ export function useEpub({ fontSize, theme, layoutMode, highlightEnabled = true, 
   const highlightSentence = useCallback((sentenceText: string) => {
     clearSentenceHighlight()
     if (!sentenceText.trim()) return
-    if (!highlightEnabled) return
+    // NOTE: no early return for !highlightEnabled — autoscroll still needs the DOM search
 
-    // Strip trailing punctuation added by getCurrentText; normalise whitespace
-    const search = sentenceText.replace(/[.!?]+$/, '').replace(/\s+/g, ' ').trim()
+    // Strip trailing punctuation added by getCurrentText; normalise typography
+    const search = normalizeText(sentenceText.replace(/[.!?]+$/, ''))
     if (!search) return
-    const searchPrefix = search.slice(0, 20)
+    const searchPrefix = search.slice(0, 30)
 
     // Regex that matches the prefix with flexible whitespace (epub may use \t/\n/&nbsp;)
     const prefixRe = new RegExp(
@@ -1363,49 +1390,56 @@ export function useEpub({ fontSize, theme, layoutMode, highlightEnabled = true, 
       const doc = c.document
       if (!doc) continue
 
-      // Find the block element whose normalised textContent contains the sentence
+      // Find the block element whose normalised textContent matches the sentence prefix
       const blocks = doc.querySelectorAll('p, li, blockquote, h1, h2, h3, h4, h5, h6, td')
       for (const block of Array.from(blocks)) {
-        const blockNorm = (block.textContent ?? '').replace(/\s+/g, ' ')
-        if (!blockNorm.includes(searchPrefix)) continue
+        const blockNorm = normalizeText(block.textContent ?? '')
+        if (!prefixRe.test(blockNorm)) continue
 
-        // Walk text nodes to find the one containing the sentence start
-        const walker = doc.createTreeWalker(block, NodeFilter.SHOW_TEXT)
-        let textNode: Text | null
-        let markedInline = false
-        while ((textNode = walker.nextNode() as Text | null)) {
-          const nodeText = textNode.textContent ?? ''
-          const m = nodeText.match(prefixRe)
-          if (!m || m.index === undefined) continue
+        let scrollTarget: HTMLElement | null = null
 
-          // Wrap the matching text in a <mark> element
-          const mark = doc.createElement('mark')
-          mark.setAttribute('data-loci-reading', 'true')
-          mark.style.cssText =
-            'background:rgba(196,168,130,0.45);border-radius:3px;color:inherit;padding:1px 2px'
-          try {
-            const range = doc.createRange()
-            range.setStart(textNode, m.index)
-            range.setEnd(textNode, Math.min(m.index + search.length, nodeText.length))
-            range.surroundContents(mark)
-            markedInline = true
-          } catch {
-            // surroundContents fails when the range crosses element boundaries
+        if (highlightEnabled) {
+          // Walk text nodes to find the one containing the sentence start
+          const walker = doc.createTreeWalker(block, NodeFilter.SHOW_TEXT)
+          let textNode: Text | null
+          let markedInline = false
+          while ((textNode = walker.nextNode() as Text | null)) {
+            const nodeNorm = normalizeText(textNode.textContent ?? '')
+            const m = nodeNorm.match(prefixRe)
+            if (!m || m.index === undefined) continue
+
+            // Wrap the matching text in a <mark> element
+            const mark = doc.createElement('mark')
+            mark.setAttribute('data-loci-reading', 'true')
+            mark.style.cssText =
+              'background:rgba(196,168,130,0.45);border-radius:3px;color:inherit;padding:1px 2px'
+            try {
+              const range = doc.createRange()
+              range.setStart(textNode, m.index)
+              range.setEnd(textNode, Math.min(m.index + search.length, (textNode.textContent ?? '').length))
+              range.surroundContents(mark)
+              markedInline = true
+            } catch {
+              // surroundContents fails when the range crosses element boundaries
+            }
+            break
           }
-          break
+
+          if (!markedInline) {
+            // Sentence start spans an inline element boundary (e.g. <em>, <strong>) —
+            // fall back to a subtle block-level highlight so something always appears
+            ;(block as HTMLElement).setAttribute('data-loci-reading', 'true')
+            ;(block as HTMLElement).style.background = 'rgba(196,168,130,0.25)'
+          }
+          scrollTarget = doc.querySelector('[data-loci-reading]') as HTMLElement | null
+        } else {
+          // No visual highlight, but use the block itself as scroll target
+          scrollTarget = block as HTMLElement
         }
 
-        if (!markedInline) {
-          // Sentence start spans an inline element boundary (e.g. <em>, <strong>) —
-          // fall back to a subtle block-level highlight so something always appears
-          ;(block as HTMLElement).setAttribute('data-loci-reading', 'true')
-          ;(block as HTMLElement).style.background = 'rgba(196,168,130,0.25)'
-        }
-
-        // Scroll the highlighted element into view if autoscroll is enabled
-        if (autoscrollEnabled) {
-          const el = doc.querySelector('[data-loci-reading]') as HTMLElement | null
-          el?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+        // Scroll into view — independent of whether highlighting is on
+        if (autoscrollEnabled && scrollTarget) {
+          scrollTarget.scrollIntoView({ behavior: 'smooth', block: 'center' })
         }
         return
       }
