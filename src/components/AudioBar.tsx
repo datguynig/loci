@@ -1,5 +1,6 @@
-import { useRef } from 'react'
+import { useRef, useState } from 'react'
 import { motion } from 'framer-motion'
+import BottomSheet from './BottomSheet'
 import type { TTSProvider, ElevenLabsModel } from '../services/ttsService'
 import type { ElevenLabsVoice } from '../services/ttsService'
 import { hasElevenLabs } from '../utils/tts'
@@ -171,6 +172,7 @@ export default function AudioBar({
 }: AudioBarProps) {
   const gearRef = useRef<HTMLButtonElement>(null)
   const isMobile = useWindowWidth() < 600
+  const [ttsSheetOpen, setTtsSheetOpen] = useState(false)
   const currentSentence = sentences[currentSentenceIndex] ?? ''
 
   const handlePlayPause = () => {
@@ -238,15 +240,16 @@ export default function AudioBar({
           height: 52,
           display: 'flex',
           alignItems: 'center',
-          justifyContent: 'space-between',
-          padding: '0 16px',
+          justifyContent: isMobile ? 'space-between' : 'space-between',
+          padding: isMobile ? '0 8px' : '0 16px',
           gap: 8,
+          paddingBottom: isMobile ? 'max(0px, env(safe-area-inset-bottom))' : undefined,
         }}
       >
-        {/* Left: transport controls */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-          <ControlButton onClick={onSkipBack} label="Skip back">
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+        {/* Transport controls */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: isMobile ? 0 : 4, flex: isMobile ? 1 : undefined, justifyContent: isMobile ? 'space-evenly' : undefined }}>
+          <ControlButton onClick={onSkipBack} label="Skip back" size={isMobile ? 'lg' : 'md'}>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <polyline points="1 4 1 10 7 10" />
               <path d="M3.51 15a9 9 0 1 0 .49-4.5" />
             </svg>
@@ -256,14 +259,14 @@ export default function AudioBar({
             {isPlaying && !isPaused ? <PauseIcon /> : <PlayIcon />}
           </ControlButton>
 
-          <ControlButton onClick={onSkipForward} label="Skip forward">
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <ControlButton onClick={onSkipForward} label="Skip forward" size={isMobile ? 'lg' : 'md'}>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <polyline points="23 4 23 10 17 10" />
               <path d="M20.49 15a9 9 0 1 1-.49-4.5" />
             </svg>
           </ControlButton>
 
-          {isPlaying && (
+          {!isMobile && isPlaying && (
             <ControlButton onClick={onStop} label="Stop">
               <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
                 <rect x="3" y="3" width="18" height="18" rx="2" />
@@ -272,150 +275,177 @@ export default function AudioBar({
           )}
         </div>
 
-        {/* Right: voice/speed controls */}
-        <div style={{ position: 'relative', display: 'flex', alignItems: 'center', gap: 8 }}>
-          <ReaderSettings
-            isOpen={settingsOpen}
-            onClose={onSettingsToggle}
-            fontSize={fontSize}
-            onFontSizeChange={onFontSizeChange}
-            layoutMode={layoutMode}
-            onLayoutModeChange={onLayoutModeChange}
-            highlightEnabled={highlightEnabled}
-            onHighlightChange={onHighlightChange}
-            autoscrollEnabled={autoscrollEnabled}
-            onAutoscrollChange={onAutoscrollChange}
-            anchorRef={gearRef}
-          />
-          {/* Waveform (ElevenLabs only) */}
-          {provider === 'elevenlabs' && isPlaying && !isPaused && <Waveform />}
+        {/* Right side: desktop shows full controls; mobile shows "…" */}
+        {!isMobile && (
+          <div style={{ position: 'relative', display: 'flex', alignItems: 'center', gap: 8 }}>
+            <ReaderSettings
+              isOpen={settingsOpen}
+              onClose={onSettingsToggle}
+              fontSize={fontSize}
+              onFontSizeChange={onFontSizeChange}
+              layoutMode={layoutMode}
+              onLayoutModeChange={onLayoutModeChange}
+              highlightEnabled={highlightEnabled}
+              onHighlightChange={onHighlightChange}
+              autoscrollEnabled={autoscrollEnabled}
+              onAutoscrollChange={onAutoscrollChange}
+              anchorRef={gearRef}
+            />
+            {provider === 'elevenlabs' && isPlaying && !isPaused && <Waveform />}
 
-          {/* ElevenLabs model toggle — hidden on mobile to save space */}
-          {HAS_ELEVENLABS && provider === 'elevenlabs' && !isMobile && (
-            <div
-              style={{
-                display: 'flex',
-                background: 'var(--bg-secondary)',
-                borderRadius: 20,
-                padding: 2,
-                border: '1px solid var(--border)',
-              }}
+            {HAS_ELEVENLABS && provider === 'elevenlabs' && (
+              <div style={{ display: 'flex', background: 'var(--bg-secondary)', borderRadius: 20, padding: 2, border: '1px solid var(--border)' }}>
+                {(['eleven_turbo_v2_5', 'eleven_multilingual_v2'] as ElevenLabsModel[]).map((m) => (
+                  <button key={m} onClick={() => setModel(m)} style={{ padding: '2px 8px', borderRadius: 16, border: 'none', background: selectedModel === m ? 'var(--accent-warm)' : 'transparent', color: selectedModel === m ? '#fff' : 'var(--text-tertiary)', fontFamily: 'var(--font-ui)', fontSize: 10, fontWeight: 500, cursor: 'pointer', transition: 'all 120ms ease', whiteSpace: 'nowrap' }}>
+                    {m === 'eleven_turbo_v2_5' ? 'Turbo' : 'Quality'}
+                  </button>
+                ))}
+              </div>
+            )}
+
+            <select value={rate} onChange={(e) => setRate(Number(e.target.value))} aria-label="Playback speed" style={selectStyle}>
+              {SPEED_OPTIONS.map((s) => <option key={s} value={s}>{s}×</option>)}
+            </select>
+
+            {HAS_ELEVENLABS && provider === 'elevenlabs' && elevenLabsVoices.length > 0 ? (
+              <VoicePicker voices={elevenLabsVoices} selectedVoiceId={selectedVoiceId} onSelect={setVoiceId} />
+            ) : provider === 'browser' && browserVoices.length > 0 ? (
+              <select value={selectedBrowserVoice?.name ?? ''} onChange={(e) => { const v = browserVoices.find((bv) => bv.name === e.target.value); if (v) setBrowserVoice(v) }} aria-label="Select voice" style={{ ...selectStyle, maxWidth: 120 }}>
+                {browserVoices.map((v) => <option key={v.name} value={v.name}>{v.name}</option>)}
+              </select>
+            ) : !HAS_ELEVENLABS && (
+              <span style={{ fontFamily: 'var(--font-ui)', fontSize: 11, color: 'var(--text-tertiary)' }}>Browser voice</span>
+            )}
+
+            <button
+              ref={gearRef}
+              onClick={onSettingsToggle}
+              aria-label="Reader settings"
+              aria-expanded={settingsOpen}
+              style={{ width: 26, height: 26, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '50%', border: 'none', background: settingsOpen ? 'var(--bg-secondary)' : 'transparent', color: settingsOpen ? 'var(--text-primary)' : 'var(--text-tertiary)', cursor: 'pointer', transition: 'all 120ms ease', flexShrink: 0 }}
+              onMouseEnter={(e) => { if (!settingsOpen) { e.currentTarget.style.color = 'var(--text-primary)'; e.currentTarget.style.background = 'var(--bg-secondary)' } }}
+              onMouseLeave={(e) => { if (!settingsOpen) { e.currentTarget.style.color = 'var(--text-tertiary)'; e.currentTarget.style.background = 'transparent' } }}
             >
-              {(['eleven_turbo_v2_5', 'eleven_multilingual_v2'] as ElevenLabsModel[]).map((m) => (
-                <button
-                  key={m}
-                  onClick={() => setModel(m)}
-                  style={{
-                    padding: '2px 8px',
-                    borderRadius: 16,
-                    border: 'none',
-                    background: selectedModel === m ? 'var(--accent-warm)' : 'transparent',
-                    color: selectedModel === m ? '#fff' : 'var(--text-tertiary)',
-                    fontFamily: 'var(--font-ui)',
-                    fontSize: 10,
-                    fontWeight: 500,
-                    cursor: 'pointer',
-                    transition: 'all 120ms ease',
-                    whiteSpace: 'nowrap',
-                  }}
-                >
-                  {m === 'eleven_turbo_v2_5' ? 'Turbo' : 'Quality'}
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="12" cy="12" r="3" />
+                <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
+              </svg>
+            </button>
+          </div>
+        )}
+
+        {/* Mobile: "…" opens TTS settings sheet */}
+        {isMobile && (
+          <button
+            onClick={() => setTtsSheetOpen(true)}
+            aria-label="Narration settings"
+            style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '8px 12px', borderRadius: 8, color: 'var(--text-tertiary)', display: 'flex', alignItems: 'center' }}
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
+              <circle cx="5" cy="12" r="1.8" />
+              <circle cx="12" cy="12" r="1.8" />
+              <circle cx="19" cy="12" r="1.8" />
+            </svg>
+          </button>
+        )}
+      </div>
+
+      {/* Mobile TTS settings sheet */}
+      {isMobile && (
+        <BottomSheet open={ttsSheetOpen} onClose={() => setTtsSheetOpen(false)} title="Narration">
+          {/* Speed */}
+          <div style={{ padding: '12px 20px 4px' }}>
+            <div style={{ fontFamily: 'var(--font-ui)', fontSize: 12, color: 'var(--text-tertiary)', marginBottom: 10 }}>Speed</div>
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+              {SPEED_OPTIONS.map((s) => (
+                <button key={s} onClick={() => setRate(s)} style={{ flex: '1 1 auto', padding: '10px 8px', borderRadius: 8, border: '1px solid var(--border)', background: rate === s ? 'var(--accent-warm)' : 'var(--bg-secondary)', color: rate === s ? '#fff' : 'var(--text-primary)', fontFamily: 'var(--font-ui)', fontSize: 14, fontWeight: 500, cursor: 'pointer' }}>
+                  {s}×
                 </button>
               ))}
             </div>
+          </div>
+
+          {/* Voice — ElevenLabs */}
+          {HAS_ELEVENLABS && provider === 'elevenlabs' && elevenLabsVoices.length > 0 && (
+            <div style={{ padding: '16px 20px 4px' }}>
+              <div style={{ fontFamily: 'var(--font-ui)', fontSize: 12, color: 'var(--text-tertiary)', marginBottom: 10 }}>Voice</div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                {elevenLabsVoices.map((v) => (
+                  <button key={v.voice_id} onClick={() => setVoiceId(v.voice_id)} style={{ padding: '10px 12px', borderRadius: 8, border: '1px solid var(--border)', background: selectedVoiceId === v.voice_id ? 'rgba(196,168,130,0.12)' : 'transparent', color: selectedVoiceId === v.voice_id ? 'var(--accent-warm)' : 'var(--text-primary)', fontFamily: 'var(--font-ui)', fontSize: 15, cursor: 'pointer', textAlign: 'left', borderColor: selectedVoiceId === v.voice_id ? 'rgba(196,168,130,0.5)' : 'var(--border)' }}>
+                    {v.name}
+                  </button>
+                ))}
+              </div>
+            </div>
           )}
 
-          {/* Speed selector */}
-          <select
-            value={rate}
-            onChange={(e) => setRate(Number(e.target.value))}
-            aria-label="Playback speed"
-            style={selectStyle}
-          >
-            {SPEED_OPTIONS.map((s) => (
-              <option key={s} value={s}>
-                {s}×
-              </option>
-            ))}
-          </select>
+          {/* Voice — browser */}
+          {provider === 'browser' && browserVoices.length > 0 && (
+            <div style={{ padding: '16px 20px 4px' }}>
+              <div style={{ fontFamily: 'var(--font-ui)', fontSize: 12, color: 'var(--text-tertiary)', marginBottom: 10 }}>Voice</div>
+              <select value={selectedBrowserVoice?.name ?? ''} onChange={(e) => { const v = browserVoices.find((bv) => bv.name === e.target.value); if (v) setBrowserVoice(v) }} aria-label="Select voice" style={{ ...selectStyle, width: '100%', fontSize: 15, padding: '10px 12px' }}>
+                {browserVoices.map((v) => <option key={v.name} value={v.name}>{v.name}</option>)}
+              </select>
+            </div>
+          )}
 
-          {/* Voice selector */}
-          {HAS_ELEVENLABS && provider === 'elevenlabs' && elevenLabsVoices.length > 0 ? (
-            <VoicePicker
-              voices={elevenLabsVoices}
-              selectedVoiceId={selectedVoiceId}
-              onSelect={setVoiceId}
-            />
-          ) : provider === 'browser' && browserVoices.length > 0 ? (
-            <select
-              value={selectedBrowserVoice?.name ?? ''}
-              onChange={(e) => {
-                const v = browserVoices.find((bv) => bv.name === e.target.value)
-                if (v) setBrowserVoice(v)
-              }}
-              aria-label="Select voice"
-              style={{ ...selectStyle, maxWidth: isMobile ? 80 : 120 }}
-            >
-              {browserVoices.map((v) => (
-                <option key={v.name} value={v.name}>
-                  {v.name}
-                </option>
-              ))}
-            </select>
-          ) : (
-            !HAS_ELEVENLABS && (
-              <span
-                style={{
-                  fontFamily: 'var(--font-ui)',
-                  fontSize: 11,
-                  color: 'var(--text-tertiary)',
-                }}
+          {/* ElevenLabs model */}
+          {HAS_ELEVENLABS && provider === 'elevenlabs' && (
+            <div style={{ padding: '16px 20px 4px' }}>
+              <div style={{ fontFamily: 'var(--font-ui)', fontSize: 12, color: 'var(--text-tertiary)', marginBottom: 10 }}>Quality</div>
+              <div style={{ display: 'flex', gap: 8 }}>
+                {(['eleven_turbo_v2_5', 'eleven_multilingual_v2'] as ElevenLabsModel[]).map((m) => (
+                  <button key={m} onClick={() => setModel(m)} style={{ flex: 1, padding: '10px 8px', borderRadius: 8, border: '1px solid var(--border)', background: selectedModel === m ? 'var(--accent-warm)' : 'var(--bg-secondary)', color: selectedModel === m ? '#fff' : 'var(--text-primary)', fontFamily: 'var(--font-ui)', fontSize: 14, fontWeight: 500, cursor: 'pointer' }}>
+                    {m === 'eleven_turbo_v2_5' ? 'Turbo' : 'Quality'}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Stop (if playing) */}
+          {isPlaying && (
+            <div style={{ padding: '16px 20px 4px' }}>
+              <button onClick={() => { onStop(); setTtsSheetOpen(false) }} style={{ width: '100%', padding: '12px', borderRadius: 8, border: '1px solid var(--border)', background: 'transparent', color: 'var(--text-secondary)', fontFamily: 'var(--font-ui)', fontSize: 15, cursor: 'pointer' }}>
+                Stop narration
+              </button>
+            </div>
+          )}
+
+          {/* Display settings */}
+          <div style={{ padding: '16px 20px 0' }}>
+            <div style={{ fontFamily: 'var(--font-ui)', fontSize: 12, color: 'var(--text-tertiary)', marginBottom: 10 }}>Display</div>
+            <div style={{ position: 'relative' }}>
+              <ReaderSettings
+                isOpen={settingsOpen}
+                onClose={onSettingsToggle}
+                fontSize={fontSize}
+                onFontSizeChange={onFontSizeChange}
+                layoutMode={layoutMode}
+                onLayoutModeChange={onLayoutModeChange}
+                highlightEnabled={highlightEnabled}
+                onHighlightChange={onHighlightChange}
+                autoscrollEnabled={autoscrollEnabled}
+                onAutoscrollChange={onAutoscrollChange}
+                anchorRef={gearRef}
+              />
+              <button
+                ref={gearRef}
+                onClick={onSettingsToggle}
+                aria-label="Reader settings"
+                aria-expanded={settingsOpen}
+                style={{ display: 'flex', alignItems: 'center', gap: 10, width: '100%', padding: '10px 12px', borderRadius: 8, border: '1px solid var(--border)', background: 'transparent', color: 'var(--text-primary)', fontFamily: 'var(--font-ui)', fontSize: 15, cursor: 'pointer', textAlign: 'left' }}
               >
-                Browser voice
-              </span>
-            )
-          )}
-
-          {/* Settings gear button */}
-          <button
-            ref={gearRef}
-            onClick={onSettingsToggle}
-            aria-label="Reader settings"
-            aria-expanded={settingsOpen}
-            style={{
-              width: 26,
-              height: 26,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              borderRadius: '50%',
-              border: 'none',
-              background: settingsOpen ? 'var(--bg-secondary)' : 'transparent',
-              color: settingsOpen ? 'var(--text-primary)' : 'var(--text-tertiary)',
-              cursor: 'pointer',
-              transition: 'all 120ms ease',
-              flexShrink: 0,
-            }}
-            onMouseEnter={(e) => {
-              if (!settingsOpen) {
-                e.currentTarget.style.color = 'var(--text-primary)'
-                e.currentTarget.style.background = 'var(--bg-secondary)'
-              }
-            }}
-            onMouseLeave={(e) => {
-              if (!settingsOpen) {
-                e.currentTarget.style.color = 'var(--text-tertiary)'
-                e.currentTarget.style.background = 'transparent'
-              }
-            }}
-          >
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <circle cx="12" cy="12" r="3" />
-              <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
-            </svg>
-          </button>
-        </div>
-      </div>
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, color: 'var(--text-secondary)' }}>
+                  <circle cx="12" cy="12" r="3" />
+                  <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
+                </svg>
+                Font, layout & highlights
+              </button>
+            </div>
+          </div>
+        </BottomSheet>
+      )}
     </motion.div>
   )
 }

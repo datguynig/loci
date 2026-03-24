@@ -17,6 +17,7 @@ import { exportAnnotationsAsMarkdown, exportAnnotationsAsJSON } from '../utils/e
 import Sidebar from './Sidebar'
 import SearchPanel from './SearchPanel'
 import AudioBar from './AudioBar'
+import BottomSheet from './BottomSheet'
 import ProgressBar from './ProgressBar'
 import ThemeToggle from './ThemeToggle'
 import Toast, { type ToastMessage } from './Toast'
@@ -24,6 +25,7 @@ import SelectionBubble from './SelectionBubble'
 import StudyPanel from './StudyPanel'
 import Scratchpad from './Scratchpad'
 import ReaderTour from './ReaderTour'
+import { useWindowWidth } from '../hooks/useWindowWidth'
 import type { StudyContext } from '../services/aiStudyService'
 
 
@@ -67,7 +69,18 @@ export default function Reader({
 }: ReaderProps) {
   const { user } = useUser()
   const userId = user?.id ?? ''
-  const epub = useEpub({ fontSize, theme, layoutMode, highlightEnabled, autoscrollEnabled })
+  const windowWidth = useWindowWidth()
+  const isMobile = windowWidth < 600
+  // Chrome visibility (mobile tap-to-hide)
+  const [chromeVisible, setChromeVisible] = useState(true)
+  const epub = useEpub({
+    fontSize,
+    theme,
+    layoutMode,
+    highlightEnabled,
+    autoscrollEnabled,
+    onContentClick: isMobile ? () => setChromeVisible((v) => !v) : undefined,
+  })
 
   // Cross-chapter TTS: when a chapter ends naturally, advance and resume
   const autoAdvancePendingRef = useRef(false)
@@ -81,6 +94,9 @@ export default function Reader({
   const bookmarks = useBookmarks(supabase, userId || null, bookId ?? null)
   const flashcards = useFlashcards(supabase as SupabaseClient, userId, bookId ?? '')
   const scratchpad = useScratchpad(supabase as SupabaseClient, userId, bookId ?? '')
+
+  // Mobile overflow sheet (header "..." menu)
+  const [overflowOpen, setOverflowOpen] = useState(false)
 
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [settingsOpen, setSettingsOpen] = useState(false)
@@ -194,6 +210,12 @@ export default function Reader({
   useEffect(() => {
     setNavigationScope(layoutMode === 'scroll' ? 'chapter' : 'page')
   }, [layoutMode])
+
+  // Auto-show chrome when TTS starts or a panel opens (mobile)
+  const anyPanelOpen = notesOpen || studyPanelOpen || scratchpadOpen || searchOpen || sidebarOpen
+  useEffect(() => {
+    if (speech.isPlaying || anyPanelOpen) setChromeVisible(true)
+  }, [speech.isPlaying, anyPanelOpen])
 
   const { clearSentenceHighlight } = epub
 
@@ -446,6 +468,11 @@ export default function Reader({
           background: 'var(--bg-surface)',
           flexShrink: 0,
           gap: 8,
+          // Chrome-hide transition on mobile
+          opacity: isMobile && !chromeVisible ? 0 : 1,
+          transform: isMobile && !chromeVisible ? 'translateY(-100%)' : 'none',
+          transition: 'opacity 200ms ease, transform 200ms ease',
+          pointerEvents: isMobile && !chromeVisible ? 'none' : 'auto',
         }}
       >
         {/* Left: back + hamburger + title */}
@@ -520,7 +547,7 @@ export default function Reader({
           {epub.totalPages > 0 && `${epub.currentPage} / ${epub.totalPages}`}
         </div>
 
-        {/* Right: action buttons */}
+        {/* Right: action buttons — desktop shows all; mobile shows overflow "…" */}
         <div
           style={{
             display: 'flex',
@@ -530,129 +557,211 @@ export default function Reader({
             justifyContent: 'flex-end',
           }}
         >
-          {/* Search button */}
-          <button
-            onClick={() => setSearchOpen((o) => !o)}
-            aria-label="Search in book"
-            aria-pressed={searchOpen}
-            style={{
-              background: searchOpen ? 'rgba(196,168,130,0.15)' : 'transparent',
-              border: searchOpen ? '1px solid rgba(196,168,130,0.4)' : '1px solid transparent',
-              borderRadius: 6,
-              cursor: 'pointer',
-              padding: '5px 7px',
-              color: searchOpen ? '#C4A882' : 'var(--text-secondary)',
-              display: 'flex',
-              alignItems: 'center',
-              transition: 'all 150ms ease',
-            }}
-          >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <circle cx="11" cy="11" r="8" />
-              <line x1="21" y1="21" x2="16.65" y2="16.65" />
-            </svg>
-          </button>
+          {!isMobile && (
+            <>
+              {/* Search button */}
+              <button
+                onClick={() => setSearchOpen((o) => !o)}
+                aria-label="Search in book"
+                aria-pressed={searchOpen}
+                style={{
+                  background: searchOpen ? 'rgba(196,168,130,0.15)' : 'transparent',
+                  border: searchOpen ? '1px solid rgba(196,168,130,0.4)' : '1px solid transparent',
+                  borderRadius: 6,
+                  cursor: 'pointer',
+                  padding: '5px 7px',
+                  color: searchOpen ? '#C4A882' : 'var(--text-secondary)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  transition: 'all 150ms ease',
+                }}
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <circle cx="11" cy="11" r="8" />
+                  <line x1="21" y1="21" x2="16.65" y2="16.65" />
+                </svg>
+              </button>
 
-          {/* Bookmark button */}
-          <button
-            onClick={handleToggleBookmark}
-            aria-label={isCurrentPageBookmarked ? 'Remove bookmark' : 'Bookmark this page'}
-            aria-pressed={isCurrentPageBookmarked}
-            style={{
-              background: isCurrentPageBookmarked ? 'rgba(196,168,130,0.15)' : 'transparent',
-              border: isCurrentPageBookmarked ? '1px solid rgba(196,168,130,0.4)' : '1px solid transparent',
-              borderRadius: 6,
-              cursor: 'pointer',
-              padding: '5px 7px',
-              color: isCurrentPageBookmarked ? '#C4A882' : 'var(--text-secondary)',
-              display: 'flex',
-              alignItems: 'center',
-              transition: 'all 150ms ease',
-            }}
-          >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill={isCurrentPageBookmarked ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2">
-              <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z" />
-            </svg>
-          </button>
+              {/* Bookmark button */}
+              <button
+                onClick={handleToggleBookmark}
+                aria-label={isCurrentPageBookmarked ? 'Remove bookmark' : 'Bookmark this page'}
+                aria-pressed={isCurrentPageBookmarked}
+                style={{
+                  background: isCurrentPageBookmarked ? 'rgba(196,168,130,0.15)' : 'transparent',
+                  border: isCurrentPageBookmarked ? '1px solid rgba(196,168,130,0.4)' : '1px solid transparent',
+                  borderRadius: 6,
+                  cursor: 'pointer',
+                  padding: '5px 7px',
+                  color: isCurrentPageBookmarked ? '#C4A882' : 'var(--text-secondary)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  transition: 'all 150ms ease',
+                }}
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill={isCurrentPageBookmarked ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2">
+                  <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z" />
+                </svg>
+              </button>
 
-          <button
-            onClick={() => {
-              const opening = !notesOpen
-              setNotesOpen(opening)
-              if (opening) {
-                setStudyPanelOpen(false)
-                setScratchpadOpen(false)
-              }
-            }}
-            aria-label="Toggle notes pane"
-            aria-pressed={notesOpen}
-            style={{
-              background: notesOpen ? 'rgba(196,168,130,0.15)' : 'transparent',
-              border: notesOpen ? '1px solid rgba(196,168,130,0.4)' : '1px solid transparent',
-              borderRadius: 6,
-              cursor: 'pointer',
-              padding: '5px 6px',
-              color: notesOpen ? '#C4A882' : 'var(--text-secondary)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              transition: 'all 150ms ease',
-            }}
-          >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
-              <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
-            </svg>
-          </button>
+              <button
+                onClick={() => {
+                  const opening = !notesOpen
+                  setNotesOpen(opening)
+                  if (opening) { setStudyPanelOpen(false); setScratchpadOpen(false) }
+                }}
+                aria-label="Toggle notes pane"
+                aria-pressed={notesOpen}
+                style={{
+                  background: notesOpen ? 'rgba(196,168,130,0.15)' : 'transparent',
+                  border: notesOpen ? '1px solid rgba(196,168,130,0.4)' : '1px solid transparent',
+                  borderRadius: 6, cursor: 'pointer', padding: '5px 6px',
+                  color: notesOpen ? '#C4A882' : 'var(--text-secondary)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  transition: 'all 150ms ease',
+                }}
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+                  <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+                </svg>
+              </button>
 
-          {/* Scratchpad button */}
-          <button
-            onClick={openScratchpad}
-            aria-label="Scratchpad"
-            style={{
-              background: scratchpadOpen ? 'rgba(196,168,130,0.15)' : 'transparent',
-              border: scratchpadOpen ? '1px solid rgba(196,168,130,0.4)' : '1px solid transparent',
-              borderRadius: 6,
-              cursor: 'pointer',
-              padding: '5px 7px',
-              color: scratchpadOpen ? '#C4A882' : 'var(--text-secondary)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              transition: 'all 150ms ease',
-            }}
-          >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2" />
-              <rect x="8" y="2" width="8" height="4" rx="1" ry="1" />
-            </svg>
-          </button>
+              <button
+                onClick={openScratchpad}
+                aria-label="Scratchpad"
+                style={{
+                  background: scratchpadOpen ? 'rgba(196,168,130,0.15)' : 'transparent',
+                  border: scratchpadOpen ? '1px solid rgba(196,168,130,0.4)' : '1px solid transparent',
+                  borderRadius: 6, cursor: 'pointer', padding: '5px 7px',
+                  color: scratchpadOpen ? '#C4A882' : 'var(--text-secondary)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  transition: 'all 150ms ease',
+                }}
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2" />
+                  <rect x="8" y="2" width="8" height="4" rx="1" ry="1" />
+                </svg>
+              </button>
 
-          {/* Study button */}
-          <button
-            onClick={openStudyPanel}
-            aria-label="Study assistant"
-            style={{
-              background: studyPanelOpen ? '#1A1917' : 'transparent',
-              border: studyPanelOpen ? '1px solid #1A1917' : '1px solid transparent',
-              borderRadius: 6,
-              cursor: 'pointer',
-              padding: '5px 7px',
-              color: studyPanelOpen ? 'var(--accent-warm)' : 'var(--text-secondary)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              transition: 'all 150ms ease',
-              fontSize: 14,
-              fontWeight: 600,
-            }}
-          >
-            ✦
-          </button>
+              <button
+                onClick={openStudyPanel}
+                aria-label="Study assistant"
+                style={{
+                  background: studyPanelOpen ? '#1A1917' : 'transparent',
+                  border: studyPanelOpen ? '1px solid #1A1917' : '1px solid transparent',
+                  borderRadius: 6, cursor: 'pointer', padding: '5px 7px',
+                  color: studyPanelOpen ? 'var(--accent-warm)' : 'var(--text-secondary)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  transition: 'all 150ms ease', fontSize: 14, fontWeight: 600,
+                }}
+              >
+                ✦
+              </button>
 
-          <ThemeToggle theme={theme} onToggle={onThemeToggle} />
+              <ThemeToggle theme={theme} onToggle={onThemeToggle} />
+            </>
+          )}
+
+          {/* Mobile overflow button */}
+          {isMobile && (
+            <button
+              onClick={() => setOverflowOpen(true)}
+              aria-label="More options"
+              style={{
+                background: 'none', border: 'none', cursor: 'pointer',
+                padding: '6px 8px', borderRadius: 6,
+                color: 'var(--text-secondary)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+              }}
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
+                <circle cx="5" cy="12" r="1.8" />
+                <circle cx="12" cy="12" r="1.8" />
+                <circle cx="19" cy="12" r="1.8" />
+              </svg>
+            </button>
+          )}
         </div>
       </motion.header>
+
+      {/* Mobile overflow sheet */}
+      {isMobile && (
+        <BottomSheet open={overflowOpen} onClose={() => setOverflowOpen(false)}>
+          {(
+            [
+              {
+                label: 'Search',
+                icon: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>,
+                active: searchOpen,
+                onPress: () => { setSearchOpen((o) => !o); setOverflowOpen(false) },
+              },
+              {
+                label: isCurrentPageBookmarked ? 'Remove bookmark' : 'Bookmark',
+                icon: <svg width="18" height="18" viewBox="0 0 24 24" fill={isCurrentPageBookmarked ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>,
+                active: isCurrentPageBookmarked,
+                onPress: () => { handleToggleBookmark(); setOverflowOpen(false) },
+              },
+              {
+                label: 'Notes',
+                icon: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>,
+                active: notesOpen,
+                onPress: () => { const o = !notesOpen; setNotesOpen(o); if (o) { setStudyPanelOpen(false); setScratchpadOpen(false) } setOverflowOpen(false) },
+              },
+              {
+                label: 'Scratchpad',
+                icon: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1" ry="1"/></svg>,
+                active: scratchpadOpen,
+                onPress: () => { openScratchpad(); setOverflowOpen(false) },
+              },
+              {
+                label: 'Study',
+                icon: <span style={{ fontSize: 18, lineHeight: 1 }}>✦</span>,
+                active: studyPanelOpen,
+                onPress: () => { openStudyPanel(); setOverflowOpen(false) },
+              },
+            ] as { label: string; icon: React.ReactNode; active: boolean; onPress: () => void }[]
+          ).map(({ label, icon, active, onPress }) => (
+            <button
+              key={label}
+              onClick={onPress}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 16,
+                width: '100%', background: 'none',
+                border: 'none', cursor: 'pointer',
+                padding: '14px 20px',
+                fontFamily: 'var(--font-ui)', fontSize: 16,
+                color: active ? 'var(--accent-warm)' : 'var(--text-primary)',
+                textAlign: 'left',
+              }}
+            >
+              <span style={{ color: active ? 'var(--accent-warm)' : 'var(--text-secondary)', flexShrink: 0 }}>{icon}</span>
+              {label}
+            </button>
+          ))}
+          <div style={{ height: 1, background: 'var(--border)', margin: '4px 20px' }} />
+          <button
+            onClick={() => { onThemeToggle(); setOverflowOpen(false) }}
+            style={{
+              display: 'flex', alignItems: 'center', gap: 16,
+              width: '100%', background: 'none',
+              border: 'none', cursor: 'pointer',
+              padding: '14px 20px',
+              fontFamily: 'var(--font-ui)', fontSize: 16,
+              color: 'var(--text-primary)', textAlign: 'left',
+            }}
+          >
+            <span style={{ color: 'var(--text-secondary)', flexShrink: 0 }}>
+              {theme === 'dark'
+                ? <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
+                : <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+              }
+            </span>
+            {theme === 'dark' ? 'Light mode' : 'Dark mode'}
+          </button>
+        </BottomSheet>
+      )}
 
       {/* Main content area */}
       <div style={{ flex: 1, display: 'flex', overflow: 'hidden', position: 'relative' }}>
@@ -1042,6 +1151,12 @@ export default function Reader({
           gap: 12,
           flexShrink: 0,
           flexWrap: 'wrap',
+          paddingBottom: 'max(0px, env(safe-area-inset-bottom))',
+          // Chrome-hide transition on mobile
+          opacity: isMobile && !chromeVisible ? 0 : 1,
+          transform: isMobile && !chromeVisible ? 'translateY(100%)' : 'none',
+          transition: 'opacity 200ms ease, transform 200ms ease',
+          pointerEvents: isMobile && !chromeVisible ? 'none' : 'auto',
         }}
       >
         <button
@@ -1134,6 +1249,13 @@ export default function Reader({
         </button>
       </div>
 
+      <div style={{
+        opacity: isMobile && !chromeVisible ? 0 : 1,
+        transform: isMobile && !chromeVisible ? 'translateY(100%)' : 'none',
+        transition: 'opacity 200ms ease, transform 200ms ease',
+        pointerEvents: isMobile && !chromeVisible ? 'none' : 'auto',
+        flexShrink: 0,
+      }}>
       <AudioBar
         isPlaying={speech.isPlaying}
         isPaused={speech.isPaused}
@@ -1174,6 +1296,7 @@ export default function Reader({
         settingsOpen={settingsOpen}
         onSettingsToggle={toggleSettings}
       />
+      </div>
 
       {/* Toast notifications */}
       <Toast messages={toasts} onDismiss={dismissToast} />

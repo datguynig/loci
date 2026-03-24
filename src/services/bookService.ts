@@ -7,6 +7,7 @@ import {
   deleteFiles,
   type GetToken,
 } from './storageService'
+import { getCachedEpub, setCachedEpub, clearBookFromCache } from './epubCache'
 
 export interface Book {
   id: string
@@ -134,9 +135,24 @@ export async function uploadBook(
   return toBook(updated)
 }
 
-export async function getBookFile(getStorageToken: GetToken, book: Book): Promise<File> {
-  const blob = await downloadFile(getStorageToken, 'books', book.filePath)
-  return new File([blob], `${book.title}.epub`, { type: 'application/epub+zip' })
+export async function getBookFile(
+  getStorageToken: GetToken,
+  book: Book,
+  onProgress?: (fraction: number) => void,
+): Promise<File> {
+  // Serve from IndexedDB cache when available (and file size matches)
+  const cached = await getCachedEpub(book.id, book.fileSize)
+  if (cached) {
+    onProgress?.(1)
+    return new File([cached], `${book.title}.epub`, { type: 'application/epub+zip' })
+  }
+
+  // Cache miss — download from MinIO then cache for next open
+  const blob = await downloadFile(getStorageToken, 'books', book.filePath, onProgress)
+  const buffer = await blob.arrayBuffer()
+  // Fire-and-forget — cache write failure must not break the open flow
+  setCachedEpub(book.id, buffer, book.fileSize ?? blob.size).catch(() => {})
+  return new File([buffer], `${book.title}.epub`, { type: 'application/epub+zip' })
 }
 
 export async function markLastRead(supabase: SupabaseClient, bookId: string): Promise<void> {
@@ -163,6 +179,9 @@ export async function deleteBook(
   // a no-op for keys that don't exist, so this is safe either way).
   const effectiveFilePath =
     book.filePath === 'pending' ? `${book.userId}/${book.id}.epub` : book.filePath
+
+  // Remove from local IndexedDB cache
+  await clearBookFromCache(book.id)
 
   // Delete storage files in parallel
   await Promise.all([

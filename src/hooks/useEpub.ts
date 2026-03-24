@@ -22,6 +22,8 @@ interface UseEpubOptions {
   layoutMode: LayoutMode
   highlightEnabled?: boolean
   autoscrollEnabled?: boolean
+  /** Called when the user taps inside the epub content area (not on a link or selection). */
+  onContentClick?: () => void
 }
 
 export interface SearchResult {
@@ -242,7 +244,7 @@ function buildRenditionOptions(layoutMode: LayoutMode) {
 }
 
 
-export function useEpub({ fontSize, theme, layoutMode, highlightEnabled = true, autoscrollEnabled = true }: UseEpubOptions): UseEpubReturn {
+export function useEpub({ fontSize, theme, layoutMode, highlightEnabled = true, autoscrollEnabled = true, onContentClick }: UseEpubOptions): UseEpubReturn {
   const [book, setBook] = useState<Book | null>(null)
   const [rendition, setRendition] = useState<Rendition | null>(null)
   const [toc, setToc] = useState<NavItem[]>([])
@@ -262,6 +264,8 @@ export function useEpub({ fontSize, theme, layoutMode, highlightEnabled = true, 
   const [error, setError] = useState<string | null>(null)
 
   const viewerRef = useRef<HTMLDivElement>(null)
+  const onContentClickRef = useRef(onContentClick)
+  onContentClickRef.current = onContentClick
   const bookRef = useRef<Book | null>(null)
   const renditionRef = useRef<Rendition | null>(null)
   const tocRef = useRef<NavItem[]>([])
@@ -805,6 +809,23 @@ export function useEpub({ fontSize, theme, layoutMode, highlightEnabled = true, 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     ;(nextRendition as any).hooks.content.register((contents: any) => {
       injectThemeOverride(contents.document as Document, themeRef.current)
+
+      const doc = contents.document as Document
+
+      // Silence Amazon KFX-converted EPUBs that call renderMiniapps()
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      ;(doc.defaultView as any).renderMiniapps = () => {}
+
+      // Forward taps on the epub content area so Reader can toggle chrome visibility
+      doc.addEventListener('click', (e) => {
+        // Ignore taps on links and interactive elements
+        const target = e.target as Element
+        if (target.closest('a') || target.closest('button') || target.closest('input')) return
+        // Only fire when there is no active text selection
+        const sel = doc.defaultView?.getSelection()
+        if (sel && sel.toString().length > 0) return
+        onContentClickRef.current?.()
+      })
     })
 
     nextRendition.on('rendered', () => {

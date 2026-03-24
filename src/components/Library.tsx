@@ -140,6 +140,7 @@ export default function Library({ supabase, getStorageToken, onOpenBook, theme, 
   const [detailBook, setDetailBook] = useState<Book | null>(null)
   const [onboardingSkipped, setOnboardingSkipped] = useState(false)
   const [openingId, setOpeningId] = useState<string | null>(null)
+  const [openingProgress, setOpeningProgress] = useState<number>(0)
   const [isDragging, setIsDragging] = useState(false)
   const [archivedOpen, setArchivedOpen] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -159,14 +160,16 @@ export default function Library({ supabase, getStorageToken, onOpenBook, theme, 
   const handleOpenBook = useCallback(
     async (book: Book) => {
       setOpeningId(book.id)
+      setOpeningProgress(0)
       setDetailBook(null)
       try {
-        const file = await getBookFile(getStorageToken, book)
+        const file = await getBookFile(getStorageToken, book, setOpeningProgress)
         await markLastRead(supabase, book.id)
         onOpenBook(file, book.id)
       } catch (err) {
         console.error('Failed to open book', err)
         setOpeningId(null)
+        setOpeningProgress(0)
       }
     },
     [supabase, getStorageToken, onOpenBook],
@@ -175,14 +178,16 @@ export default function Library({ supabase, getStorageToken, onOpenBook, theme, 
   const handleStudyBook = useCallback(
     async (book: Book, opts: { panel?: 'scratchpad'; chapterHref?: string }) => {
       setOpeningId(book.id)
+      setOpeningProgress(0)
       setDetailBook(null)
       try {
-        const file = await getBookFile(getStorageToken, book)
+        const file = await getBookFile(getStorageToken, book, setOpeningProgress)
         await markLastRead(supabase, book.id)
         onOpenBook(file, book.id, opts)
       } catch (err) {
         console.error('Failed to open book for study', err)
         setOpeningId(null)
+        setOpeningProgress(0)
       }
     },
     [supabase, getStorageToken, onOpenBook],
@@ -377,6 +382,7 @@ export default function Library({ supabase, getStorageToken, onOpenBook, theme, 
               <ContinueBanner
                 book={continueBook}
                 opening={openingId === continueBook.id}
+                openingProgress={openingProgress}
                 onOpen={() => handleOpenBook(continueBook)}
                 onDetail={() => setDetailBook(continueBook)}
                 readingSeconds={continueBookSeconds}
@@ -386,6 +392,7 @@ export default function Library({ supabase, getStorageToken, onOpenBook, theme, 
             <BookGrid
               books={activeBooks}
               openingId={openingId}
+              openingProgress={openingProgress}
               onOpen={handleOpenBook}
               onDetail={setDetailBook}
             />
@@ -436,6 +443,7 @@ export default function Library({ supabase, getStorageToken, onOpenBook, theme, 
                       <BookGrid
                         books={archivedBooks}
                         openingId={openingId}
+                        openingProgress={openingProgress}
                         onOpen={handleOpenBook}
                         onDetail={setDetailBook}
                         muted
@@ -560,12 +568,14 @@ function EmptyState({
 function ContinueBanner({
   book,
   opening,
+  openingProgress,
   onOpen,
   onDetail,
   readingSeconds,
 }: {
   book: Book
   opening: boolean
+  openingProgress: number
   onOpen: () => void
   onDetail: () => void
   readingSeconds: number
@@ -692,6 +702,27 @@ function ContinueBanner({
 
         </button>
 
+        {/* Download progress bar for ContinueBanner */}
+        {opening && openingProgress > 0 && openingProgress < 1 && (
+          <div style={{
+            position: 'absolute',
+            bottom: 0,
+            left: 0,
+            right: 0,
+            height: 3,
+            background: 'var(--border)',
+            borderRadius: '0 0 12px 12px',
+            overflow: 'hidden',
+          }}>
+            <div style={{
+              height: '100%',
+              width: `${openingProgress * 100}%`,
+              background: 'var(--accent)',
+              transition: 'width 120ms linear',
+            }} />
+          </div>
+        )}
+
         {/* Details button — positioned absolutely so it doesn't affect card layout */}
         {!opening && (
           <button
@@ -733,12 +764,14 @@ function ContinueBanner({
 function BookGrid({
   books,
   openingId,
+  openingProgress,
   onOpen,
   onDetail,
   muted = false,
 }: {
   books: Book[]
   openingId: string | null
+  openingProgress: number
   onOpen: (book: Book) => void
   onDetail: (book: Book) => void
   muted?: boolean
@@ -767,6 +800,7 @@ function BookGrid({
             key={book.id}
             book={book}
             opening={openingId === book.id}
+            openingProgress={openingId === book.id ? openingProgress : 0}
             onOpen={() => onOpen(book)}
             onDetail={() => onDetail(book)}
           />
@@ -779,11 +813,13 @@ function BookGrid({
 function BookCard({
   book,
   opening,
+  openingProgress,
   onOpen,
   onDetail,
 }: {
   book: Book
   opening: boolean
+  openingProgress: number
   onOpen: () => void
   onDetail: () => void
 }) {
@@ -865,6 +901,26 @@ function BookCard({
             {opening ? 'Opening…' : 'Read'}
           </span>
         </div>
+
+        {/* Download progress bar — shown during first-time open */}
+        {opening && openingProgress > 0 && openingProgress < 1 && (
+          <div style={{
+            position: 'absolute',
+            bottom: 0,
+            left: 0,
+            right: 0,
+            height: 3,
+            background: 'rgba(255,255,255,0.2)',
+            overflow: 'hidden',
+          }}>
+            <div style={{
+              height: '100%',
+              width: `${openingProgress * 100}%`,
+              background: 'var(--accent-warm)',
+              transition: 'width 120ms linear',
+            }} />
+          </div>
+        )}
 
         {/* Details button: always rendered, fades in on hover */}
         <button
