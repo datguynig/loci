@@ -298,7 +298,7 @@ export default function Reader({
     }
   }, [bookmarks, epub.currentHref, epub.toc, epub.currentChapter])
 
-  const { goToHref, toc, currentChapterIndex, getCurrentText } = epub
+  const { toc, currentChapterIndex, getCurrentText } = epub
 
   const handleNextReadingStep = useCallback(() => {
     if (navigationScope === 'chapter') {
