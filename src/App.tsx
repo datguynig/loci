@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { AnimatePresence } from 'framer-motion'
 import { SignedIn, SignedOut, useAuth, useUser } from '@clerk/clerk-react'
+import { Analytics } from '@vercel/analytics/react'
 import Library from './components/Library'
 import Reader from './components/Reader'
 import Landing from './components/Landing'
@@ -216,6 +217,7 @@ export default function App() {
           <TermsOfService onBack={closeLegal} />
         </div>
       )}
+      <Analytics />
     </>
   )
 }
