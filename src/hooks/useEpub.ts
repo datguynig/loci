@@ -60,7 +60,7 @@ export interface UseEpubReturn {
   searchBook: (query: string) => Promise<SearchResult[]>
   highlightSentence: (text: string) => void
   clearSentenceHighlight: () => void
-  highlightWord: (word: string) => void
+  highlightWord: (wordIndex: number) => void
   setOnTextSelected: (cb: ((quote: string, href: string, pos: { x: number; y: number }) => void) | null) => void
   applyAnnotationHighlights: (annotations: Annotation[]) => void
   isLoading: boolean
@@ -1456,15 +1456,15 @@ export function useEpub({ fontSize, theme, layoutMode, highlightEnabled = true, 
     }
   }, [clearSentenceHighlight, highlightEnabled, autoscrollEnabled])
 
-  const highlightWord = useCallback((word: string) => {
-    if (!word.trim()) return
+  const highlightWord = useCallback((wordIndex: number) => {
+    if (wordIndex < 0) return
     const contents = renditionRef.current?.getContents() ?? []
 
     for (const c of contents) {
       const doc = c.document
       if (!doc) continue
 
-      // Clear previous word mark
+      // Clear previous word mark and re-merge fragmented text nodes
       doc.querySelectorAll('mark[data-loci-word]').forEach((m) => {
         m.replaceWith(...Array.from(m.childNodes))
       })
@@ -1474,42 +1474,48 @@ export function useEpub({ fontSize, theme, layoutMode, highlightEnabled = true, 
       const root = currentSentenceBlockRef.current ?? doc.body
       if (!root) continue
 
-      const normWord = normalizeText(word)
-      if (!normWord) continue
-      const wordRe = new RegExp(normWord.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i')
-
+      // Walk tokens (non-whitespace runs) in order and highlight the Nth one.
+      // Using index-based matching avoids the "always finds first occurrence" bug
+      // that occurs with repeated common words like "the", "a", "is".
+      let tokenCount = 0
       const walker = doc.createTreeWalker(root, NodeFilter.SHOW_TEXT)
       let textNode: Text | null
-      while ((textNode = walker.nextNode() as Text | null)) {
-        const nodeNorm = normalizeText(textNode.textContent ?? '')
-        const m = nodeNorm.match(wordRe)
-        if (!m || m.index === undefined) continue
+      const tokenRe = /\S+/g
 
-        const mark = doc.createElement('mark')
-        mark.setAttribute('data-loci-word', 'true')
-        mark.style.cssText =
-          'background:rgba(196,168,130,0.6);border-radius:2px;color:inherit;padding:0 1px'
-        try {
-          const range = doc.createRange()
-          range.setStart(textNode, m.index)
-          range.setEnd(textNode, m.index + word.length)
-          range.surroundContents(mark)
-        } catch {
-          break  // range crosses element boundary — skip
-        }
+      outer: while ((textNode = walker.nextNode() as Text | null)) {
+        const text = textNode.textContent ?? ''
+        tokenRe.lastIndex = 0
+        let match: RegExpExecArray | null
+        while ((match = tokenRe.exec(text)) !== null) {
+          if (tokenCount === wordIndex) {
+            const mark = doc.createElement('mark')
+            mark.setAttribute('data-loci-word', 'true')
+            mark.style.cssText =
+              'background:rgba(196,168,130,0.6);border-radius:2px;color:inherit;padding:0 1px'
+            try {
+              const range = doc.createRange()
+              range.setStart(textNode, match.index)
+              range.setEnd(textNode, match.index + match[0].length)
+              range.surroundContents(mark)
 
-        // Scroll-on-demand: only move if the word has drifted out of the visible area
-        if (autoscrollEnabled) {
-          const win = doc.defaultView
-          if (win) {
-            const rect = mark.getBoundingClientRect()
-            const inView = rect.top >= 0 && rect.bottom <= win.innerHeight
-            if (!inView) {
-              mark.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
+              // Scroll-on-demand: only move if the word has drifted out of the visible area
+              if (autoscrollEnabled) {
+                const win = doc.defaultView
+                if (win) {
+                  const rect = mark.getBoundingClientRect()
+                  const inView = rect.top >= 0 && rect.bottom <= win.innerHeight
+                  if (!inView) {
+                    mark.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
+                  }
+                }
+              }
+            } catch {
+              // range crosses element boundary — skip silently
             }
+            break outer
           }
+          tokenCount++
         }
-        return
       }
     }
   }, [autoscrollEnabled])

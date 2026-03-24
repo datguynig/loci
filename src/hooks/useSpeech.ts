@@ -38,6 +38,8 @@ export interface UseSpeechReturn {
   sentences: string[]
   /** Current word being spoken (ElevenLabs only; empty string for browser TTS). */
   currentWord: string
+  /** Index of the current word in the sentence's word-timing array (-1 when not active). */
+  currentWordIndex: number
 }
 
 export function useSpeech(options?: { onEnded?: () => void }): UseSpeechReturn {
@@ -66,8 +68,10 @@ export function useSpeech(options?: { onEnded?: () => void }): UseSpeechReturn {
   const [rate, setRate] = useState(1.0)
 
   const [currentWord, setCurrentWord] = useState('')
+  const [currentWordIndex, setCurrentWordIndex] = useState(-1)
   const wordTimingsRef = useRef<WordTiming[]>([])
   const lastWordRef = useRef('')
+  const lastWordIndexRef = useRef(-1)
 
   // Refs for stable callbacks (avoid stale closures in async loops)
   const currentAudioRef = useRef<HTMLAudioElement | null>(null)
@@ -159,7 +163,9 @@ export function useSpeech(options?: { onEnded?: () => void }): UseSpeechReturn {
 
       // Reset word tracking for the new sentence
       setCurrentWord('')
+      setCurrentWordIndex(-1)
       lastWordRef.current = ''
+      lastWordIndexRef.current = -1
 
       try {
         const result = await streamSentence(
@@ -186,10 +192,12 @@ export function useSpeech(options?: { onEnded?: () => void }): UseSpeechReturn {
         // Track which word is being spoken via timeupdate (~4× per second)
         audio.addEventListener('timeupdate', () => {
           const t = audio.currentTime
-          const timing = wordTimings.find((w) => t >= w.startTime && t <= w.endTime + 0.05)
-          if (timing && timing.word !== lastWordRef.current) {
-            lastWordRef.current = timing.word
-            setCurrentWord(timing.word)
+          const idx = wordTimings.findIndex((w) => t >= w.startTime && t <= w.endTime + 0.05)
+          if (idx >= 0 && idx !== lastWordIndexRef.current) {
+            lastWordIndexRef.current = idx
+            lastWordRef.current = wordTimings[idx].word
+            setCurrentWordIndex(idx)
+            setCurrentWord(wordTimings[idx].word)
           }
         })
       } catch {
@@ -282,7 +290,9 @@ export function useSpeech(options?: { onEnded?: () => void }): UseSpeechReturn {
     isPausedRef.current = true
     setIsPaused(true)
     setCurrentWord('')
+    setCurrentWordIndex(-1)
     lastWordRef.current = ''
+    lastWordIndexRef.current = -1
 
     if (provider === 'elevenlabs') {
       currentAudioRef.current?.pause()
@@ -310,7 +320,9 @@ export function useSpeech(options?: { onEnded?: () => void }): UseSpeechReturn {
     setIsPaused(false)
     setCurrentSentenceIndex(0)
     setCurrentWord('')
+    setCurrentWordIndex(-1)
     lastWordRef.current = ''
+    lastWordIndexRef.current = -1
     indexRef.current = 0
 
     if (currentAudioRef.current) {
@@ -445,5 +457,6 @@ export function useSpeech(options?: { onEnded?: () => void }): UseSpeechReturn {
     currentSentenceIndex,
     sentences,
     currentWord,
+    currentWordIndex,
   }
 }

@@ -289,10 +289,10 @@ export default function Reader({
 
   // Word-level highlight (ElevenLabs only) — fires on each timeupdate tick
   useEffect(() => {
-    if (!speech.currentWord || !speech.isPlaying || speech.isPaused) return
+    if (speech.currentWordIndex < 0 || !speech.isPlaying || speech.isPaused) return
     if (speech.provider !== 'elevenlabs') return
-    highlightWord(speech.currentWord)
-  }, [speech.currentWord, speech.isPlaying, speech.isPaused, speech.provider, highlightWord])
+    highlightWord(speech.currentWordIndex)
+  }, [speech.currentWordIndex, speech.isPlaying, speech.isPaused, speech.provider, highlightWord])
 
   // Re-apply annotation underlines whenever the chapter changes
   const { applyAnnotationHighlights, setOnTextSelected, currentHref } = epub
