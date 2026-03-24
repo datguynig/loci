@@ -1,4 +1,6 @@
 // No-op stub served by Vercel rewrite for Amazon KFX-converted EPUBs.
-// These EPUBs call renderMiniapps() which tries to dynamically load this file.
-// Returning a stub prevents the 404 and silences the console error.
+// renderMiniapps() dynamically loads this file and expects miniappJson to be
+// defined after load. We provide empty stubs so the onload handler doesn't
+// throw ReferenceError: miniappJson is not defined.
 window.renderMiniapps = function () {};
+window.miniappJson = window.miniappJson || {};
