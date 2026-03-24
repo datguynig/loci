@@ -196,39 +196,45 @@ export default function Reader({
   }, [layoutMode])
 
   const { clearSentenceHighlight } = epub
+  const { stop: stopSpeech, speak: speakSpeech, pause: pauseSpeech, resume: resumeSpeech } = speech
 
-  // BUG-08: stop TTS when user navigates to a new page
   const handleNextPage = useCallback(() => {
-    speech.stop()
+    stopSpeech()
     clearSentenceHighlight()
     epub.nextPage()
-  }, [speech, clearSentenceHighlight, epub.nextPage])
+  }, [stopSpeech, clearSentenceHighlight, epub.nextPage])
 
   const handlePrevPage = useCallback(() => {
-    speech.stop()
+    stopSpeech()
     clearSentenceHighlight()
     epub.prevPage()
-  }, [speech, clearSentenceHighlight, epub.prevPage])
+  }, [stopSpeech, clearSentenceHighlight, epub.prevPage])
 
   const handleNextChapter = useCallback(() => {
-    speech.stop()
+    stopSpeech()
     clearSentenceHighlight()
     epub.nextChapter()
-  }, [speech, clearSentenceHighlight, epub.nextChapter])
+  }, [stopSpeech, clearSentenceHighlight, epub.nextChapter])
 
   const handlePrevChapter = useCallback(() => {
-    speech.stop()
+    stopSpeech()
     clearSentenceHighlight()
     epub.prevChapter()
-  }, [speech, clearSentenceHighlight, epub.prevChapter])
+  }, [stopSpeech, clearSentenceHighlight, epub.prevChapter])
+
+  const handleNavigate = useCallback((href: string) => {
+    stopSpeech()
+    clearSentenceHighlight()
+    epub.goToHref(href)
+  }, [stopSpeech, clearSentenceHighlight, epub.goToHref])
 
   // Cross-chapter TTS auto-advance: speak new chapter once it finishes rendering
   useEffect(() => {
     if (!autoAdvancePendingRef.current || !epub.hasRenderedContent) return
     autoAdvancePendingRef.current = false
     const text = epub.getCurrentText()
-    if (text) speech.speak(text)
-  }, [epub.hasRenderedContent, epub.currentHref, epub.getCurrentText, speech.speak])
+    if (text) speakSpeech(text)
+  }, [epub.hasRenderedContent, epub.currentHref, epub.getCurrentText, speakSpeech])
 
   // TTS reading highlight — glow the paragraph being spoken
   const { highlightSentence } = epub
@@ -289,7 +295,6 @@ export default function Reader({
     }
   }, [bookmarks, epub.currentHref, epub.toc, epub.currentChapter])
 
-  // BUG-05: destructure stable callbacks/values so the effect only re-runs when they change
   const { goToHref, toc, currentChapterIndex, getCurrentText } = epub
 
   const handleNextReadingStep = useCallback(() => {
@@ -334,7 +339,7 @@ export default function Reader({
         case '[': {
           const prevIdx = currentChapterIndex - 1
           if (prevIdx >= 0 && toc[prevIdx]) {
-            speech.stop()
+            stopSpeech()
             goToHref(toc[prevIdx].href)
           }
           break
@@ -342,20 +347,20 @@ export default function Reader({
         case ']': {
           const nextIdx = currentChapterIndex + 1
           if (toc[nextIdx]) {
-            speech.stop()
+            stopSpeech()
             goToHref(toc[nextIdx].href)
           }
           break
         }
         case 'p':
         case 'P':
-          if (speech.isPlaying && !speech.isPaused) speech.pause()
-          else if (speech.isPaused) speech.resume()
-          else speech.speak(getCurrentText())
+          if (speech.isPlaying && !speech.isPaused) pauseSpeech()
+          else if (speech.isPaused) resumeSpeech()
+          else speakSpeech(getCurrentText())
           break
         case 's':
         case 'S':
-          speech.stop()
+          stopSpeech()
           break
         case 't':
         case 'T':
@@ -382,14 +387,18 @@ export default function Reader({
     window.addEventListener('keydown', handler)
     return () => window.removeEventListener('keydown', handler)
   }, [
-    // BUG-05: stable references only — effect re-registers only when these actually change
     handleNextReadingStep,
     handlePrevReadingStep,
     goToHref,
     toc,
     currentChapterIndex,
     getCurrentText,
-    speech,
+    stopSpeech,
+    speakSpeech,
+    pauseSpeech,
+    resumeSpeech,
+    speech.isPlaying,
+    speech.isPaused,
     fontSize,
     onThemeToggle,
     onFontSizeChange,
@@ -661,7 +670,7 @@ export default function Reader({
           toc={epub.toc}
           isOpen={sidebarOpen}
           currentHref={epub.currentHref}
-          onNavigate={epub.goToHref}
+          onNavigate={handleNavigate}
           onClose={() => setSidebarOpen(false)}
           annotations={annotations.annotations}
           onDeleteAnnotation={(id) => {
@@ -678,7 +687,7 @@ export default function Reader({
           {searchOpen && (
             <SearchPanel
               onSearch={epub.searchBook}
-              onNavigate={epub.goToHref}
+              onNavigate={handleNavigate}
               onClose={() => setSearchOpen(false)}
               toc={epub.toc}
             />
