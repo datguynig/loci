@@ -281,6 +281,9 @@ export function useEpub({ fontSize, theme, layoutMode, highlightEnabled = true, 
 
   const viewerRef = useRef<HTMLDivElement>(null)
   const currentSentenceBlockRef = useRef<Element | null>(null)
+  // Token offset: how many block tokens appear before the current sentence starts.
+  // Needed because wordIndex is 0-based within the sentence, not the whole paragraph.
+  const sentenceStartTokenRef = useRef(0)
   const onContentClickRef = useRef(onContentClick)
   onContentClickRef.current = onContentClick
   const onParagraphClickRef = useRef(onParagraphClick)
@@ -1354,6 +1357,7 @@ export function useEpub({ fontSize, theme, layoutMode, highlightEnabled = true, 
 
   const clearSentenceHighlight = useCallback(() => {
     currentSentenceBlockRef.current = null
+    sentenceStartTokenRef.current = 0
     const contents = renditionRef.current?.getContents() ?? []
     for (const c of contents) {
       const doc = c.document
@@ -1460,7 +1464,11 @@ export function useEpub({ fontSize, theme, layoutMode, highlightEnabled = true, 
 
   const findSentenceBlock = useCallback((sentenceText: string) => {
     const search = normalizeText(sentenceText.replace(/[.!?]+$/, ''))
-    if (!search) return
+    if (!search) {
+      currentSentenceBlockRef.current = null
+      sentenceStartTokenRef.current = 0
+      return
+    }
     const searchPrefix = search.slice(0, 30)
     const prefixRe = new RegExp(
       searchPrefix.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/\s+/g, '\\s+'),
@@ -1469,12 +1477,22 @@ export function useEpub({ fontSize, theme, layoutMode, highlightEnabled = true, 
       const doc = c.document
       if (!doc) continue
       for (const block of Array.from(doc.querySelectorAll('p, li, blockquote, h1, h2, h3, h4, h5, h6, td'))) {
-        if (prefixRe.test(normalizeText(block.textContent ?? ''))) {
-          currentSentenceBlockRef.current = block
-          return
-        }
+        const blockNorm = normalizeText(block.textContent ?? '')
+        const m = prefixRe.exec(blockNorm)
+        if (!m) continue
+
+        currentSentenceBlockRef.current = block
+
+        // Count how many whitespace-separated tokens appear before the sentence start.
+        // ElevenLabs word indices are 0-based within the sentence — we add this offset
+        // so highlightWord lands on the correct token when multiple sentences share one block.
+        const textBefore = blockNorm.slice(0, m.index)
+        sentenceStartTokenRef.current = textBefore.match(/\S+/g)?.length ?? 0
+        return
       }
     }
+    currentSentenceBlockRef.current = null
+    sentenceStartTokenRef.current = 0
   }, [])
 
   const highlightWord = useCallback((wordIndex: number) => {
@@ -1495,9 +1513,11 @@ export function useEpub({ fontSize, theme, layoutMode, highlightEnabled = true, 
       const root = currentSentenceBlockRef.current ?? doc.body
       if (!root) continue
 
-      // Walk tokens (non-whitespace runs) in order and highlight the Nth one.
-      // Using index-based matching avoids the "always finds first occurrence" bug
-      // that occurs with repeated common words like "the", "a", "is".
+      // Walk tokens in order to the target position.
+      // absoluteIndex = sentence-start offset + word's 0-based index within the sentence.
+      // Without the offset, word 0 always lands on the first token of the paragraph,
+      // causing the highlight to snap back to the top when a new sentence starts mid-block.
+      const absoluteIndex = sentenceStartTokenRef.current + wordIndex
       let tokenCount = 0
       const walker = doc.createTreeWalker(root, NodeFilter.SHOW_TEXT)
       let textNode: Text | null
@@ -1508,7 +1528,7 @@ export function useEpub({ fontSize, theme, layoutMode, highlightEnabled = true, 
         tokenRe.lastIndex = 0
         let match: RegExpExecArray | null
         while ((match = tokenRe.exec(text)) !== null) {
-          if (tokenCount === wordIndex) {
+          if (tokenCount === absoluteIndex) {
             const mark = doc.createElement('mark')
             mark.setAttribute('data-loci-word', 'true')
             mark.style.cssText =
