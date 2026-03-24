@@ -36,19 +36,21 @@ export interface UseSpeechReturn {
   setRate: (r: number) => void
   currentSentenceIndex: number
   sentences: string[]
-  /** Current word being spoken (ElevenLabs only; empty string for browser TTS). */
-  currentWord: string
-  /** Index of the current word in the sentence's word-timing array (-1 when not active). */
-  currentWordIndex: number
 }
 
-export function useSpeech(options?: { onEnded?: () => void }): UseSpeechReturn {
+export function useSpeech(options?: {
+  onEnded?: () => void
+  /** Called directly from the audio timeupdate handler — bypasses React rendering for zero-lag word highlights. */
+  onWordChange?: (wordIndex: number) => void
+}): UseSpeechReturn {
   const hasElevenLabsConfigured = hasElevenLabs()
   const [provider] = useState<TTSProvider>(resolveTtsProvider())
 
-  // Keep onEnded ref current so the playback loops don't close over a stale callback
+  // Keep callbacks in refs so async loops never close over stale values
   const onEndedRef = useRef(options?.onEnded)
   useEffect(() => { onEndedRef.current = options?.onEnded }, [options?.onEnded])
+  const onWordChangeRef = useRef(options?.onWordChange)
+  useEffect(() => { onWordChangeRef.current = options?.onWordChange }, [options?.onWordChange])
 
   const [isPlaying, setIsPlaying] = useState(false)
   const [isPaused, setIsPaused] = useState(false)
@@ -67,10 +69,7 @@ export function useSpeech(options?: { onEnded?: () => void }): UseSpeechReturn {
   // Shared
   const [rate, setRate] = useState(1.0)
 
-  const [currentWord, setCurrentWord] = useState('')
-  const [currentWordIndex, setCurrentWordIndex] = useState(-1)
   const wordTimingsRef = useRef<WordTiming[]>([])
-  const lastWordRef = useRef('')
   const lastWordIndexRef = useRef(-1)
 
   // Refs for stable callbacks (avoid stale closures in async loops)
@@ -161,10 +160,7 @@ export function useSpeech(options?: { onEnded?: () => void }): UseSpeechReturn {
       setCurrentSentenceIndex(idx)
       indexRef.current = idx
 
-      // Reset word tracking for the new sentence
-      setCurrentWord('')
-      setCurrentWordIndex(-1)
-      lastWordRef.current = ''
+      // Reset word index tracking for the new sentence
       lastWordIndexRef.current = -1
 
       try {
@@ -189,15 +185,13 @@ export function useSpeech(options?: { onEnded?: () => void }): UseSpeechReturn {
         wordTimingsRef.current = wordTimings
         currentAudioRef.current = audio
 
-        // Track which word is being spoken via timeupdate (~4× per second)
+        // Track which word is being spoken — call directly, bypassing React state
         audio.addEventListener('timeupdate', () => {
           const t = audio.currentTime
           const idx = wordTimings.findIndex((w) => t >= w.startTime && t <= w.endTime + 0.05)
           if (idx >= 0 && idx !== lastWordIndexRef.current) {
             lastWordIndexRef.current = idx
-            lastWordRef.current = wordTimings[idx].word
-            setCurrentWordIndex(idx)
-            setCurrentWord(wordTimings[idx].word)
+            onWordChangeRef.current?.(idx)
           }
         })
       } catch {
@@ -289,9 +283,6 @@ export function useSpeech(options?: { onEnded?: () => void }): UseSpeechReturn {
     if (!isPlayingRef.current || isPausedRef.current) return
     isPausedRef.current = true
     setIsPaused(true)
-    setCurrentWord('')
-    setCurrentWordIndex(-1)
-    lastWordRef.current = ''
     lastWordIndexRef.current = -1
 
     if (provider === 'elevenlabs') {
@@ -319,9 +310,6 @@ export function useSpeech(options?: { onEnded?: () => void }): UseSpeechReturn {
     setIsPlaying(false)
     setIsPaused(false)
     setCurrentSentenceIndex(0)
-    setCurrentWord('')
-    setCurrentWordIndex(-1)
-    lastWordRef.current = ''
     lastWordIndexRef.current = -1
     indexRef.current = 0
 
@@ -456,7 +444,5 @@ export function useSpeech(options?: { onEnded?: () => void }): UseSpeechReturn {
     setRate,
     currentSentenceIndex,
     sentences,
-    currentWord,
-    currentWordIndex,
   }
 }

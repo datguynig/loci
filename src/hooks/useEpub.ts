@@ -60,6 +60,8 @@ export interface UseEpubReturn {
   searchBook: (query: string) => Promise<SearchResult[]>
   highlightSentence: (text: string) => void
   clearSentenceHighlight: () => void
+  /** Find and store the sentence block element without applying any visual highlight. Used by ElevenLabs word-highlight path. */
+  findSentenceBlock: (sentenceText: string) => void
   highlightWord: (wordIndex: number) => void
   setOnTextSelected: (cb: ((quote: string, href: string, pos: { x: number; y: number }) => void) | null) => void
   applyAnnotationHighlights: (annotations: Annotation[]) => void
@@ -1456,6 +1458,25 @@ export function useEpub({ fontSize, theme, layoutMode, highlightEnabled = true, 
     }
   }, [clearSentenceHighlight, highlightEnabled, autoscrollEnabled])
 
+  const findSentenceBlock = useCallback((sentenceText: string) => {
+    const search = normalizeText(sentenceText.replace(/[.!?]+$/, ''))
+    if (!search) return
+    const searchPrefix = search.slice(0, 30)
+    const prefixRe = new RegExp(
+      searchPrefix.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/\s+/g, '\\s+'),
+    )
+    for (const c of renditionRef.current?.getContents() ?? []) {
+      const doc = c.document
+      if (!doc) continue
+      for (const block of Array.from(doc.querySelectorAll('p, li, blockquote, h1, h2, h3, h4, h5, h6, td'))) {
+        if (prefixRe.test(normalizeText(block.textContent ?? ''))) {
+          currentSentenceBlockRef.current = block
+          return
+        }
+      }
+    }
+  }, [])
+
   const highlightWord = useCallback((wordIndex: number) => {
     if (wordIndex < 0) return
     const contents = renditionRef.current?.getContents() ?? []
@@ -1617,6 +1638,7 @@ export function useEpub({ fontSize, theme, layoutMode, highlightEnabled = true, 
     searchBook,
     highlightSentence,
     clearSentenceHighlight,
+    findSentenceBlock,
     highlightWord,
     setOnTextSelected,
     applyAnnotationHighlights,

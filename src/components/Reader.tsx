@@ -100,7 +100,14 @@ export default function Reader({
     epub.nextChapter()
   }, [epub.nextChapter])
 
-  const speech = useSpeech({ onEnded: handleTTSEnded })
+  // Stable ref so the onWordChange callback passed to useSpeech never becomes stale
+  const highlightWordRef = useRef(epub.highlightWord)
+  highlightWordRef.current = epub.highlightWord
+
+  const speech = useSpeech({
+    onEnded: handleTTSEnded,
+    onWordChange: useCallback((idx: number) => highlightWordRef.current(idx), []),
+  })
 
   // Wire paragraph-click → speakFromHint (after speech is available)
   const { speakFromHint } = speech
@@ -274,25 +281,25 @@ export default function Reader({
     if (text) speech.speak(text)
   }, [epub.hasRenderedContent, epub.currentHref, epub.getCurrentText, speech.speak])
 
-  // TTS sentence highlight — sets the sentence block ref + visual for browser TTS
-  const { highlightSentence, highlightWord } = epub
+  // TTS sentence tracking:
+  // - ElevenLabs: find the block element only (no visual mark — word highlight handles it)
+  // - Browser TTS: full sentence-level visual highlight
+  const { highlightSentence } = epub
   useEffect(() => {
     if (speech.isPlaying && !speech.isPaused) {
       const sentence = speech.sentences[speech.currentSentenceIndex]
-      // Always run highlightSentence: sets currentSentenceBlockRef for word-level search
-      // and provides sentence-scope background for both providers
-      if (sentence) highlightSentence(sentence)
+      if (sentence) {
+        if (speech.provider === 'elevenlabs') {
+          epub.findSentenceBlock(sentence)
+        } else {
+          highlightSentence(sentence)
+        }
+      }
     } else {
       clearSentenceHighlight()
     }
-  }, [speech.currentSentenceIndex, speech.isPlaying, speech.isPaused, highlightSentence, clearSentenceHighlight])
-
-  // Word-level highlight (ElevenLabs only) — fires on each timeupdate tick
-  useEffect(() => {
-    if (speech.currentWordIndex < 0 || !speech.isPlaying || speech.isPaused) return
-    if (speech.provider !== 'elevenlabs') return
-    highlightWord(speech.currentWordIndex)
-  }, [speech.currentWordIndex, speech.isPlaying, speech.isPaused, speech.provider, highlightWord])
+  }, [speech.currentSentenceIndex, speech.isPlaying, speech.isPaused,
+      speech.provider, epub.findSentenceBlock, highlightSentence, clearSentenceHighlight])
 
   // Re-apply annotation underlines whenever the chapter changes
   const { applyAnnotationHighlights, setOnTextSelected, currentHref } = epub
