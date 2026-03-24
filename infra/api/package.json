@@ -1,0 +1,13 @@
+{
+  "name": "loci-presign-api",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "start": "bun run index.ts"
+  },
+  "dependencies": {
+    "@aws-sdk/client-s3": "^3.600.0",
+    "@aws-sdk/s3-request-presigner": "^3.600.0",
+    "jose": "^5.6.3"
+  }
+}

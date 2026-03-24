@@ -2,6 +2,7 @@ import { useState, useRef, useCallback, useEffect } from 'react'
 import OnboardingWelcome from './OnboardingWelcome'
 import { motion, AnimatePresence } from 'framer-motion'
 import type { SupabaseClient } from '@supabase/supabase-js'
+import type { GetToken } from '../services/storageService'
 import { UserButton } from '@clerk/clerk-react'
 import { useLibrary } from '../hooks/useLibrary'
 import { getBookFile, markLastRead, type Book } from '../services/bookService'
@@ -9,16 +10,133 @@ import { loadProgress } from '../services/progressService'
 import { formatDuration } from '../utils/formatDuration'
 import BookDetailModal from './BookDetailModal'
 import ThemeToggle from './ThemeToggle'
+import type { ColorScheme } from '../hooks/usePreferences'
+import { useWindowWidth } from '../hooks/useWindowWidth'
+
+// ─── Appearance settings page (rendered inside Clerk UserButton profile modal) ─
+
+const PALETTE_OPTIONS = [
+  { key: 'library' as const, label: 'Library', accent: '#1D6B48', warm: '#B8952A', bgLight: '#FDFBF5', bgDark: '#172019' },
+  { key: 'slate'   as const, label: 'Slate',   accent: '#B5622A', warm: '#C8751E', bgLight: '#FFFFFF', bgDark: '#232220' },
+]
+
+function PaletteIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="13.5" cy="6.5" r=".5" fill="currentColor"/>
+      <circle cx="17.5" cy="10.5" r=".5" fill="currentColor"/>
+      <circle cx="8.5"  cy="7.5"  r=".5" fill="currentColor"/>
+      <circle cx="6.5"  cy="12.5" r=".5" fill="currentColor"/>
+      <path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.926 0 1.648-.746 1.648-1.688 0-.437-.18-.835-.437-1.125-.29-.289-.438-.652-.438-1.125a1.64 1.64 0 0 1 1.668-1.668h1.996c3.051 0 5.555-2.503 5.555-5.554C21.965 6.012 17.461 2 12 2z"/>
+    </svg>
+  )
+}
+
+function AppearanceSettingsPage({
+  theme,
+  onThemeToggle,
+  colorScheme,
+  onColorSchemeToggle,
+}: {
+  theme: 'light' | 'dark'
+  onThemeToggle: () => void
+  colorScheme: ColorScheme
+  onColorSchemeToggle: () => void
+}) {
+  const sectionLabel: React.CSSProperties = {
+    fontFamily: 'var(--font-ui)',
+    fontSize: 13,
+    fontWeight: 600,
+    color: 'var(--text-primary)',
+    margin: '0 0 12px',
+  }
+  const optionBtn = (active: boolean): React.CSSProperties => ({
+    flex: 1,
+    padding: '12px 14px',
+    borderRadius: 10,
+    border: `1.5px solid ${active ? 'var(--accent-warm)' : 'var(--border)'}`,
+    background: active ? 'var(--accent-warm-highlight)' : 'var(--bg-secondary)',
+    cursor: 'pointer',
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    gap: 8,
+    transition: 'border-color 140ms ease, background 140ms ease',
+  })
+  const optionLabel = (active: boolean): React.CSSProperties => ({
+    fontFamily: 'var(--font-ui)',
+    fontSize: 12,
+    fontWeight: active ? 600 : 400,
+    color: active ? 'var(--accent-warm)' : 'var(--text-secondary)',
+  })
+
+  return (
+    <div>
+      {/* Mode */}
+      <p style={sectionLabel}>Mode</p>
+      <div style={{ display: 'flex', gap: 10, marginBottom: 28 }}>
+        {(['light', 'dark'] as const).map((t) => (
+          <button key={t} onClick={() => { if (theme !== t) onThemeToggle() }} style={optionBtn(theme === t)}>
+            <div style={{
+              width: '100%', height: 56, borderRadius: 6, overflow: 'hidden',
+              background: t === 'light' ? '#FDFBF5' : '#0A0D0B',
+              border: '1px solid rgba(128,128,128,0.15)',
+            }}>
+              <div style={{ height: 13, background: t === 'light' ? '#F7F2E7' : '#111510', borderBottom: '1px solid rgba(128,128,128,0.1)' }} />
+              <div style={{ padding: '7px 9px', display: 'flex', flexDirection: 'column', gap: 4 }}>
+                <div style={{ height: 3, borderRadius: 2, background: t === 'light' ? '#1A150E' : '#EDE8D5', opacity: 0.55, width: '65%' }} />
+                <div style={{ height: 3, borderRadius: 2, background: t === 'light' ? '#1A150E' : '#EDE8D5', opacity: 0.25, width: '45%' }} />
+              </div>
+            </div>
+            <span style={optionLabel(theme === t)}>{t === 'light' ? 'Light' : 'Dark'}</span>
+          </button>
+        ))}
+      </div>
+
+      {/* Palette */}
+      <p style={sectionLabel}>Palette</p>
+      <div style={{ display: 'flex', gap: 10 }}>
+        {PALETTE_OPTIONS.map(({ key, label, accent, warm, bgLight, bgDark }) => (
+          <button key={key} onClick={() => { if (colorScheme !== key) onColorSchemeToggle() }} style={optionBtn(colorScheme === key)}>
+            <div style={{
+              width: '100%', height: 56, borderRadius: 6, overflow: 'hidden',
+              background: theme === 'dark' ? bgDark : bgLight,
+              border: '1px solid rgba(128,128,128,0.15)',
+            }}>
+              <div style={{ height: 13, background: 'rgba(0,0,0,0.04)', borderBottom: `1px solid ${accent}33` }} />
+              <div style={{ padding: '7px 9px', display: 'flex', flexDirection: 'column', gap: 4 }}>
+                <div style={{ height: 3, borderRadius: 2, background: warm, opacity: 0.75, width: '60%' }} />
+                <div style={{ height: 3, borderRadius: 2, background: accent, opacity: 0.55, width: '40%' }} />
+              </div>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+              <span style={{ width: 7, height: 7, borderRadius: '50%', background: accent, display: 'inline-block', flexShrink: 0 }} />
+              <span style={{ width: 7, height: 7, borderRadius: '50%', background: warm, display: 'inline-block', flexShrink: 0 }} />
+              <span style={{ ...optionLabel(colorScheme === key), marginLeft: 2 }}>{label}</span>
+            </div>
+          </button>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+// ─── Library ──────────────────────────────────────────────────────────────────
 
 interface LibraryProps {
   supabase: SupabaseClient
+  getStorageToken: GetToken
   onOpenBook: (file: File, bookId?: string, studyOptions?: { panel?: 'scratchpad'; chapterHref?: string }) => void
   theme: 'light' | 'dark'
   onThemeToggle: () => void
+  colorScheme: ColorScheme
+  onColorSchemeToggle: () => void
 }
 
-export default function Library({ supabase, onOpenBook, theme, onThemeToggle }: LibraryProps) {
-  const { books, loading, uploadState, uploadError, upload, refresh } = useLibrary(supabase)
+export default function Library({ supabase, getStorageToken, onOpenBook, theme, onThemeToggle, colorScheme, onColorSchemeToggle }: LibraryProps) {
+  const width = useWindowWidth()
+  const isMobile = width < 600
+  const { books, loading, uploadState, uploadError, upload, refresh } = useLibrary(supabase, getStorageToken)
   const [detailBook, setDetailBook] = useState<Book | null>(null)
   const [onboardingSkipped, setOnboardingSkipped] = useState(false)
   const [openingId, setOpeningId] = useState<string | null>(null)
@@ -43,7 +161,7 @@ export default function Library({ supabase, onOpenBook, theme, onThemeToggle }: 
       setOpeningId(book.id)
       setDetailBook(null)
       try {
-        const file = await getBookFile(supabase, book)
+        const file = await getBookFile(getStorageToken, book)
         await markLastRead(supabase, book.id)
         onOpenBook(file, book.id)
       } catch (err) {
@@ -59,7 +177,7 @@ export default function Library({ supabase, onOpenBook, theme, onThemeToggle }: 
       setOpeningId(book.id)
       setDetailBook(null)
       try {
-        const file = await getBookFile(supabase, book)
+        const file = await getBookFile(getStorageToken, book)
         await markLastRead(supabase, book.id)
         onOpenBook(file, book.id, opts)
       } catch (err) {
@@ -112,7 +230,7 @@ export default function Library({ supabase, onOpenBook, theme, onThemeToggle }: 
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      style={{ minHeight: '100vh', background: 'var(--bg-primary)' }}
+      style={{ minHeight: '100vh', background: 'var(--bg-primary)', display: 'flex', flexDirection: 'column' }}
     >
       <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
 
@@ -121,7 +239,7 @@ export default function Library({ supabase, onOpenBook, theme, onThemeToggle }: 
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',
-        padding: '0 32px',
+        padding: isMobile ? '0 16px' : '0 32px',
         height: 60,
         borderBottom: '1px solid var(--border)',
         background: 'var(--bg-surface)',
@@ -129,13 +247,17 @@ export default function Library({ supabase, onOpenBook, theme, onThemeToggle }: 
         top: 0,
         zIndex: 10,
       }}>
-        <span style={{
-          fontFamily: '"Playfair Display", Georgia, serif',
-          fontSize: 20,
-          fontWeight: 700,
-          color: 'var(--text-primary)',
-          letterSpacing: '-0.3px',
-        }}>Loci</span>
+        <span
+          onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
+          style={{
+            fontFamily: '"Playfair Display", Georgia, serif',
+            fontSize: 20,
+            fontWeight: 700,
+            color: 'var(--text-primary)',
+            letterSpacing: '-0.3px',
+            cursor: 'pointer',
+          }}
+        >Loci</span>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
           <button
             type="button"
@@ -180,8 +302,17 @@ export default function Library({ supabase, onOpenBook, theme, onThemeToggle }: 
               </>
             )}
           </button>
+          <UserButton>
+            <UserButton.UserProfilePage label="Appearance" url="appearance" labelIcon={<PaletteIcon />}>
+              <AppearanceSettingsPage
+                theme={theme}
+                onThemeToggle={onThemeToggle}
+                colorScheme={colorScheme}
+                onColorSchemeToggle={onColorSchemeToggle}
+              />
+            </UserButton.UserProfilePage>
+          </UserButton>
           <ThemeToggle theme={theme} onToggle={onThemeToggle} />
-          <UserButton />
         </div>
       </header>
 
@@ -193,17 +324,17 @@ export default function Library({ supabase, onOpenBook, theme, onThemeToggle }: 
         onChange={(e) => handleFiles(e.target.files)}
       />
 
-      <main style={{ maxWidth: 1100, margin: '0 auto', padding: '40px 32px' }}>
+      <main style={{ maxWidth: 1100, margin: '0 auto', padding: isMobile ? '24px 16px' : '40px 32px', flex: 1, width: '100%' }}>
         {uploadError && (
           <div style={{
-            background: '#FEF2F2',
-            border: '1px solid #FCA5A5',
+            background: 'var(--error-bg)',
+            border: '1px solid var(--error-border)',
             borderRadius: 8,
             padding: '10px 14px',
             marginBottom: 20,
             fontFamily: '"DM Sans", sans-serif',
             fontSize: 13,
-            color: '#DC2626',
+            color: 'var(--error)',
           }}>
             {uploadError}
           </div>
@@ -318,12 +449,39 @@ export default function Library({ supabase, onOpenBook, theme, onThemeToggle }: 
         )}
       </main>
 
+      {/* Library footer */}
+      <footer style={{
+        borderTop: '1px solid var(--border)',
+        padding: '16px 32px',
+        display: 'flex',
+        alignItems: 'center',
+        gap: 20,
+      }}>
+          <a
+            href="#privacy"
+            style={{ fontFamily: 'var(--font-ui)', fontSize: 12, color: 'var(--text-tertiary)', textDecoration: 'none' }}
+            onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--text-secondary)' }}
+            onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--text-tertiary)' }}
+          >
+            Privacy Policy
+          </a>
+          <a
+            href="#terms"
+            style={{ fontFamily: 'var(--font-ui)', fontSize: 12, color: 'var(--text-tertiary)', textDecoration: 'none' }}
+            onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--text-secondary)' }}
+            onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--text-tertiary)' }}
+          >
+            Terms of Service
+          </a>
+      </footer>
+
       <AnimatePresence>
         {detailBook && (
           <BookDetailModal
             key={detailBook.id}
             book={detailBook}
             supabase={supabase}
+            getStorageToken={getStorageToken}
             onClose={() => setDetailBook(null)}
             onRead={() => handleOpenBook(detailBook)}
             onStudy={(opts) => handleStudyBook(detailBook, opts)}
@@ -333,6 +491,7 @@ export default function Library({ supabase, onOpenBook, theme, onThemeToggle }: 
           />
         )}
       </AnimatePresence>
+
     </motion.div>
   )
 }
@@ -351,11 +510,11 @@ function EmptyState({
   return (
     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', paddingTop: 80, gap: 28 }}>
       <svg width="52" height="52" viewBox="0 0 52 52" fill="none">
-        <rect x="10" y="6" width="28" height="40" rx="3" stroke="#C4A882" strokeWidth="1.5" />
-        <rect x="14" y="6" width="28" height="40" rx="3" fill="#FFFFFF" stroke="#C4A882" strokeWidth="1.5" />
-        <line x1="20" y1="18" x2="36" y2="18" stroke="#C4A882" strokeWidth="1.5" strokeLinecap="round" />
-        <line x1="20" y1="24" x2="36" y2="24" stroke="#C4A882" strokeWidth="1.5" strokeLinecap="round" />
-        <line x1="20" y1="30" x2="30" y2="30" stroke="#C4A882" strokeWidth="1.5" strokeLinecap="round" />
+        <rect x="10" y="6" width="28" height="40" rx="3" stroke="var(--accent-warm)" strokeWidth="1.5" />
+        <rect x="14" y="6" width="28" height="40" rx="3" fill="var(--bg-surface)" stroke="var(--accent-warm)" strokeWidth="1.5" />
+        <line x1="20" y1="18" x2="36" y2="18" stroke="var(--accent-warm)" strokeWidth="1.5" strokeLinecap="round" />
+        <line x1="20" y1="24" x2="36" y2="24" stroke="var(--accent-warm)" strokeWidth="1.5" strokeLinecap="round" />
+        <line x1="20" y1="30" x2="30" y2="30" stroke="var(--accent-warm)" strokeWidth="1.5" strokeLinecap="round" />
       </svg>
       <div style={{ textAlign: 'center' }}>
         <h2 style={{
@@ -376,12 +535,12 @@ function EmptyState({
         {...dragProps}
         onClick={isUploading ? undefined : onBrowse}
         style={{
-          border: `2px dashed ${isDragging ? '#C4A882' : '#D8D4CD'}`,
+          border: `2px dashed ${isDragging ? 'var(--accent-warm)' : 'var(--text-tertiary)'}`,
           borderRadius: 12,
           padding: '28px 52px',
           textAlign: 'center',
           cursor: isUploading ? 'default' : 'pointer',
-          background: isDragging ? 'rgba(196,168,130,0.06)' : 'transparent',
+          background: isDragging ? 'var(--accent-subtle)' : 'transparent',
           transition: 'all 180ms ease',
         }}
       >
@@ -413,6 +572,7 @@ function ContinueBanner({
 }) {
   const [hovered, setHovered] = useState(false)
   const [detailHovered, setDetailHovered] = useState(false)
+  const isMobile = useWindowWidth() < 600
 
   return (
     <div style={{ marginBottom: 44 }}>
@@ -430,7 +590,7 @@ function ContinueBanner({
         style={{
           position: 'relative',
           display: 'inline-flex',
-          maxWidth: 500,
+          maxWidth: isMobile ? '100%' : 500,
           width: '100%',
         }}
         onMouseEnter={() => setHovered(true)}
@@ -451,8 +611,8 @@ function ContinueBanner({
           padding: '18px 48px 18px 18px',
           borderRadius: 12,
           border: hovered && !opening
-            ? '1px solid rgba(196,168,130,0.45)'
-            : '1px solid rgba(26,25,23,0.08)',
+            ? '1px solid var(--accent)'
+            : '1px solid var(--border)',
           background: 'var(--bg-surface)',
           cursor: opening ? 'default' : 'pointer',
           textAlign: 'left',
@@ -480,7 +640,7 @@ function ContinueBanner({
               <div style={{
                 width: 48,
                 height: 72,
-                background: 'linear-gradient(160deg, #E8E4DC, #D8D4CD)',
+                background: 'var(--cover-empty-gradient)',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
@@ -583,6 +743,7 @@ function BookGrid({
   onDetail: (book: Book) => void
   muted?: boolean
 }) {
+  const isMobile = useWindowWidth() < 600
   return (
     <div>
       {!muted && (
@@ -598,8 +759,8 @@ function BookGrid({
       )}
       <div style={{
         display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fill, minmax(148px, 1fr))',
-        gap: '32px 22px',
+        gridTemplateColumns: `repeat(auto-fill, minmax(${isMobile ? 110 : 148}px, 1fr))`,
+        gap: isMobile ? '24px 14px' : '32px 22px',
       }}>
         {books.map((book) => (
           <BookCard

@@ -6,6 +6,7 @@ import { hasElevenLabs } from '../utils/tts'
 import type { FontSize, LayoutMode } from '../hooks/useEpub'
 import VoicePicker from './VoicePicker'
 import ReaderSettings from './ReaderSettings'
+import { useWindowWidth } from '../hooks/useWindowWidth'
 
 const HAS_ELEVENLABS = hasElevenLabs()
 
@@ -169,6 +170,7 @@ export default function AudioBar({
   onSettingsToggle,
 }: AudioBarProps) {
   const gearRef = useRef<HTMLButtonElement>(null)
+  const isMobile = useWindowWidth() < 600
   const currentSentence = sentences[currentSentenceIndex] ?? ''
 
   const handlePlayPause = () => {
@@ -221,7 +223,7 @@ export default function AudioBar({
       >
         <span
           style={{
-            background: 'rgba(196,168,130,0.25)',
+            background: 'var(--accent-warm-highlight)',
             padding: '1px 4px',
             borderRadius: 3,
           }}
@@ -288,8 +290,8 @@ export default function AudioBar({
           {/* Waveform (ElevenLabs only) */}
           {provider === 'elevenlabs' && isPlaying && !isPaused && <Waveform />}
 
-          {/* ElevenLabs model toggle */}
-          {HAS_ELEVENLABS && provider === 'elevenlabs' && (
+          {/* ElevenLabs model toggle — hidden on mobile to save space */}
+          {HAS_ELEVENLABS && provider === 'elevenlabs' && !isMobile && (
             <div
               style={{
                 display: 'flex',
@@ -352,7 +354,7 @@ export default function AudioBar({
                 if (v) setBrowserVoice(v)
               }}
               aria-label="Select voice"
-              style={{ ...selectStyle, maxWidth: 120 }}
+              style={{ ...selectStyle, maxWidth: isMobile ? 80 : 120 }}
             >
               {browserVoices.map((v) => (
                 <option key={v.name} value={v.name}>

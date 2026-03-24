@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import type { SupabaseClient } from '@supabase/supabase-js'
+import type { GetToken } from '../services/storageService'
+import { useWindowWidth } from '../hooks/useWindowWidth'
 import { type Annotation, getAnnotationsFromSupabase } from '../services/annotationService'
 import { exportAnnotationsAsMarkdown, exportAnnotationsAsJSON } from '../utils/exportAnnotations'
 import { loadProgress } from '../services/progressService'
@@ -21,6 +23,7 @@ import {
 interface BookDetailModalProps {
   book: Book
   supabase: SupabaseClient
+  getStorageToken: GetToken
   onClose: () => void
   onRead: () => void
   onArchive: (book: Book) => void
@@ -32,6 +35,7 @@ interface BookDetailModalProps {
 export default function BookDetailModal({
   book,
   supabase,
+  getStorageToken,
   onClose,
   onRead,
   onArchive,
@@ -100,7 +104,7 @@ export default function BookDetailModal({
   const handleDelete = async () => {
     setDeleting(true)
     try {
-      await deleteBook(supabase, book)
+      await deleteBook(supabase, getStorageToken, book)
       onDelete(book)
       onClose()
     } catch (err) {
@@ -133,7 +137,10 @@ export default function BookDetailModal({
     return [...map.entries()]
   }, [flashcards])
 
+  const isMobile = useWindowWidth() < 768
   const displayRating = hoverRating ?? rating
+
+  const coverWidth = isMobile ? 80 : 168
 
   return (
     <>
@@ -166,7 +173,7 @@ export default function BookDetailModal({
           alignItems: 'center',
           justifyContent: 'center',
           zIndex: 51,
-          padding: '24px 16px',
+          padding: isMobile ? '12px 8px' : '24px 16px',
           pointerEvents: 'none',
         }}
       >
@@ -176,8 +183,8 @@ export default function BookDetailModal({
           aria-label="Close"
           style={{
             position: 'absolute',
-            top: 32,
-            right: 32,
+            top: isMobile ? 16 : 32,
+            right: isMobile ? 16 : 32,
             background: 'rgba(255,255,255,0.18)',
             border: 'none',
             borderRadius: '50%',
@@ -210,32 +217,42 @@ export default function BookDetailModal({
             maxWidth: 720,
             maxHeight: 'calc(100vh - 48px)',
             display: 'flex',
-            flexDirection: 'row',
+            flexDirection: isMobile ? 'column' : 'row',
             overflow: 'hidden',
             pointerEvents: 'auto',
           }}
         >
-          {/* Left: Warm panel with cover + Read CTA */}
-          <div style={{
+          {/* Left/Top: panel with cover + Read CTA */}
+          <div style={isMobile ? {
+            background: 'var(--bg-secondary)',
+            borderBottom: '1px solid var(--border)',
+            padding: '20px 20px',
+            display: 'flex',
+            flexDirection: 'row',
+            alignItems: 'flex-start',
+            gap: 16,
+            flexShrink: 0,
+          } : {
             width: 220,
             flexShrink: 0,
-            background: '#F5F2EE',
-            borderRight: '1px solid #EAE7E1',
+            background: 'var(--bg-secondary)',
+            borderRight: '1px solid var(--border)',
             padding: '36px 24px 28px',
             display: 'flex',
             flexDirection: 'column',
             alignItems: 'center',
             gap: 20,
           }}>
+            {/* Cover */}
             {book.coverUrl ? (
               <img
                 src={book.coverUrl}
                 alt={book.title}
                 style={{
-                  width: 168,
+                  width: coverWidth,
                   aspectRatio: '2/3',
                   objectFit: 'cover',
-                  borderRadius: 10,
+                  borderRadius: isMobile ? 7 : 10,
                   boxShadow: '0 8px 32px rgba(0,0,0,0.22), 3px 3px 0 rgba(0,0,0,0.06)',
                   display: 'block',
                   flexShrink: 0,
@@ -243,10 +260,10 @@ export default function BookDetailModal({
               />
             ) : (
               <div style={{
-                width: 168,
+                width: coverWidth,
                 aspectRatio: '2/3',
-                borderRadius: 10,
-                background: 'linear-gradient(145deg, #E8E4DC 0%, #D5D0C8 100%)',
+                borderRadius: isMobile ? 7 : 10,
+                background: 'var(--cover-empty-gradient)',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
@@ -258,107 +275,178 @@ export default function BookDetailModal({
                   fontFamily: '"Lora", Georgia, serif',
                   fontSize: 12,
                   fontWeight: 600,
-                  color: '#8A8680',
+                  color: 'var(--text-secondary)',
                   textAlign: 'center',
                   lineHeight: 1.4,
                 }}>{book.title}</span>
               </div>
             )}
 
-            <button
-              onClick={onRead}
-              style={{
-                width: 168,
-                background: '#1A1917',
-                color: '#FFFFFF',
-                border: 'none',
-                borderRadius: 10,
-                padding: '11px 0',
-                fontFamily: '"DM Sans", system-ui, sans-serif',
-                fontSize: 14,
-                fontWeight: 600,
-                cursor: 'pointer',
-                letterSpacing: '0.02em',
-                flexShrink: 0,
-              }}
-            >
-              Read
-            </button>
-
-            {(totalReadingSeconds > 0 || flashcards.length > 0 || annotations.length > 0 || quizSessions.length > 0) && (
-              <div style={{
-                width: 168,
-                background: '#EAE7E1',
-                borderRadius: 8,
-                padding: '10px 12px',
-                display: 'flex',
-                flexDirection: 'column',
-                gap: 6,
-              }}>
-                {totalReadingSeconds > 0 && (
-                  <StatRow label="Reading time" value={formatDuration(totalReadingSeconds)} warm={false} />
+            {/* On mobile, stack actions to the right of the cover */}
+            {isMobile ? (
+              <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 10, minWidth: 0 }}>
+                <div>
+                  <div style={{
+                    fontFamily: '"Lora", Georgia, serif',
+                    fontSize: 16,
+                    fontWeight: 700,
+                    color: 'var(--text-primary)',
+                    lineHeight: 1.25,
+                    marginBottom: 3,
+                    display: '-webkit-box',
+                    WebkitLineClamp: 2,
+                    WebkitBoxOrient: 'vertical',
+                    overflow: 'hidden',
+                  }}>{book.title}</div>
+                  {book.author && (
+                    <div style={{
+                      fontFamily: '"DM Sans", system-ui, sans-serif',
+                      fontSize: 12,
+                      color: 'var(--text-secondary)',
+                    }}>{book.author}</div>
+                  )}
+                </div>
+                <button
+                  onClick={onRead}
+                  style={{
+                    background: 'var(--accent)',
+                    color: '#FFFFFF',
+                    border: 'none',
+                    borderRadius: 8,
+                    padding: '9px 0',
+                    fontFamily: '"DM Sans", system-ui, sans-serif',
+                    fontSize: 13,
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                    letterSpacing: '0.02em',
+                    width: '100%',
+                  }}
+                >
+                  Read
+                </button>
+                {(totalReadingSeconds > 0 || flashcards.length > 0 || annotations.length > 0) && (
+                  <div style={{
+                    background: 'var(--bg-primary)',
+                    borderRadius: 7,
+                    padding: '8px 10px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: 5,
+                  }}>
+                    {totalReadingSeconds > 0 && (
+                      <StatRow label="Reading time" value={formatDuration(totalReadingSeconds)} warm={false} />
+                    )}
+                    {flashcards.length > 0 && (
+                      <StatRow label="Flashcards" value={String(flashcards.length)} warm={true} />
+                    )}
+                    {annotations.filter(a => a.type === 'note').length > 0 && (
+                      <StatRow label="Highlights" value={String(annotations.filter(a => a.type === 'note').length)} warm={false} />
+                    )}
+                  </div>
                 )}
-                {totalReadingSeconds > 0 && (flashcards.length > 0 || annotations.length > 0 || quizSessions.length > 0) && (
-                  <div style={{ height: 1, background: '#D8D4CC' }} />
-                )}
-                {flashcards.length > 0 && (
-                  <StatRow label="Flashcards" value={String(flashcards.length)} warm={true} />
-                )}
-                {(() => {
-                  const chapterNoteCount = annotations.filter(a => a.type === 'chapter_note').length
-                  return chapterNoteCount > 0 ? (
-                    <StatRow label="Chapter notes" value={String(chapterNoteCount)} warm={true} />
-                  ) : null
-                })()}
-                {(() => {
-                  const highlightCount = annotations.filter(a => a.type === 'note').length
-                  return highlightCount > 0 ? (
-                    <StatRow label="Highlights" value={String(highlightCount)} warm={false} />
-                  ) : null
-                })()}
-                {(() => {
-                  const best = getBestScore(quizSessions)
-                  return best ? (
-                    <StatRow label="Best quiz" value={`${best.score} / ${best.total}`} warm={true} />
-                  ) : null
-                })()}
               </div>
-            )}
+            ) : (
+              <>
+                <button
+                  onClick={onRead}
+                  style={{
+                    width: 168,
+                    background: 'var(--accent)',
+                    color: '#FFFFFF',
+                    border: 'none',
+                    borderRadius: 10,
+                    padding: '11px 0',
+                    fontFamily: '"DM Sans", system-ui, sans-serif',
+                    fontSize: 14,
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                    letterSpacing: '0.02em',
+                    flexShrink: 0,
+                  }}
+                >
+                  Read
+                </button>
 
-            {/* Book metadata */}
-            {book.addedAt && (
-              <p style={{
-                fontFamily: '"DM Sans", system-ui, sans-serif',
-                fontSize: 11,
-                color: '#B0ADA8',
-                margin: 0,
-                textAlign: 'center',
-                lineHeight: 1.4,
-              }}>
-                Added {new Date(book.addedAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
-              </p>
+                {(totalReadingSeconds > 0 || flashcards.length > 0 || annotations.length > 0 || quizSessions.length > 0) && (
+                  <div style={{
+                    width: 168,
+                    background: 'var(--bg-primary)',
+                    borderRadius: 8,
+                    padding: '10px 12px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: 6,
+                  }}>
+                    {totalReadingSeconds > 0 && (
+                      <StatRow label="Reading time" value={formatDuration(totalReadingSeconds)} warm={false} />
+                    )}
+                    {totalReadingSeconds > 0 && (flashcards.length > 0 || annotations.length > 0 || quizSessions.length > 0) && (
+                      <div style={{ height: 1, background: 'var(--border)' }} />
+                    )}
+                    {flashcards.length > 0 && (
+                      <StatRow label="Flashcards" value={String(flashcards.length)} warm={true} />
+                    )}
+                    {(() => {
+                      const chapterNoteCount = annotations.filter(a => a.type === 'chapter_note').length
+                      return chapterNoteCount > 0 ? (
+                        <StatRow label="Chapter notes" value={String(chapterNoteCount)} warm={true} />
+                      ) : null
+                    })()}
+                    {(() => {
+                      const highlightCount = annotations.filter(a => a.type === 'note').length
+                      return highlightCount > 0 ? (
+                        <StatRow label="Highlights" value={String(highlightCount)} warm={false} />
+                      ) : null
+                    })()}
+                    {(() => {
+                      const best = getBestScore(quizSessions)
+                      return best ? (
+                        <StatRow label="Best quiz" value={`${best.score} / ${best.total}`} warm={true} />
+                      ) : null
+                    })()}
+                  </div>
+                )}
+
+                {/* Book metadata */}
+                {book.addedAt && (
+                  <p style={{
+                    fontFamily: '"DM Sans", system-ui, sans-serif',
+                    fontSize: 11,
+                    color: 'var(--text-tertiary)',
+                    margin: 0,
+                    textAlign: 'center',
+                    lineHeight: 1.4,
+                  }}>
+                    Added {new Date(book.addedAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
+                  </p>
+                )}
+              </>
             )}
           </div>
 
           {/* Right: Details */}
-          <div style={{ flex: 1, overflowY: 'auto', padding: '32px 28px 28px' }}>
-            {/* Title + Author */}
-            <h2 style={{
-              fontFamily: '"Lora", Georgia, serif',
-              fontSize: 21,
-              fontWeight: 700,
-              color: '#1A1917',
-              margin: '0 0 5px',
-              lineHeight: 1.25,
-            }}>{book.title}</h2>
-            {book.author && (
-              <p style={{
-                fontFamily: '"DM Sans", system-ui, sans-serif',
-                fontSize: 14,
-                color: '#8A8680',
-                margin: '0 0 28px',
-                fontWeight: 400,
-              }}>{book.author}</p>
+          <div style={{ flex: 1, overflowY: 'auto', padding: isMobile ? '20px 20px 24px' : '32px 28px 28px' }}>
+            {/* Title + Author — hidden on mobile (shown in top panel) */}
+            {!isMobile && (
+              <>
+                <h2 style={{
+                  fontFamily: '"Lora", Georgia, serif',
+                  fontSize: 21,
+                  fontWeight: 700,
+                  color: 'var(--text-primary)',
+                  margin: '0 0 5px',
+                  lineHeight: 1.25,
+                }}>{book.title}</h2>
+                {book.author && (
+                  <p style={{
+                    fontFamily: '"DM Sans", system-ui, sans-serif',
+                    fontSize: 14,
+                    color: 'var(--text-secondary)',
+                    margin: '0 0 28px',
+                    fontWeight: 400,
+                  }}>{book.author}</p>
+                )}
+              </>
             )}
 
             {/* Star rating */}
@@ -380,7 +468,7 @@ export default function BookDetailModal({
                       cursor: 'pointer',
                       padding: 0,
                       fontSize: 24,
-                      color: displayRating !== null && star <= displayRating ? '#C4A882' : '#D8D4CD',
+                      color: displayRating !== null && star <= displayRating ? 'var(--accent-warm)' : 'var(--text-tertiary)',
                       transition: 'color 80ms ease',
                       lineHeight: 1,
                     }}
@@ -406,13 +494,13 @@ export default function BookDetailModal({
                   width: '100%',
                   boxSizing: 'border-box',
                   resize: 'vertical',
-                  border: reviewFocused ? '1px solid rgba(196,168,130,0.6)' : '1px solid #E8E5E0',
+                  border: reviewFocused ? '1px solid var(--accent)' : '1px solid var(--border)',
                   borderRadius: 10,
                   padding: '11px 13px',
                   fontFamily: '"DM Sans", system-ui, sans-serif',
                   fontSize: 13,
-                  color: '#1A1917',
-                  background: '#FAFAF8',
+                  color: 'var(--text-primary)',
+                  background: 'var(--bg-surface)',
                   outline: 'none',
                   lineHeight: 1.55,
                   transition: 'border-color 150ms ease',
@@ -429,19 +517,19 @@ export default function BookDetailModal({
                     onClick={handleExportFlashcards}
                     style={{
                       background: 'none',
-                      border: '1px solid #D8D4CD',
+                      border: '1px solid var(--border)',
                       borderRadius: 6,
                       padding: '4px 10px',
                       fontFamily: '"DM Sans", system-ui, sans-serif',
                       fontSize: 11,
-                      color: '#8A8680',
+                      color: 'var(--text-secondary)',
                       cursor: 'pointer',
                     }}
                   >↗ Export</button>
                 </div>
                 {groupedFlashcards.map(([href, cards]) => (
                   <div key={href} style={{
-                    background: '#FAFAF8',
+                    background: 'var(--bg-primary)',
                     borderRadius: 7,
                     padding: '8px 10px',
                     display: 'flex',
@@ -453,7 +541,7 @@ export default function BookDetailModal({
                       <div style={{
                         fontFamily: '"DM Sans", system-ui, sans-serif',
                         fontSize: 10,
-                        color: '#C4A882',
+                        color: 'var(--accent-warm)',
                         fontWeight: 600,
                         marginBottom: 2,
                       }}>
@@ -462,7 +550,7 @@ export default function BookDetailModal({
                       <div style={{
                         fontFamily: '"DM Sans", system-ui, sans-serif',
                         fontSize: 9,
-                        color: '#8A8780',
+                        color: 'var(--text-secondary)',
                       }}>
                         {cards.length} card{cards.length !== 1 ? 's' : ''}{cards.some(c => c.lastReviewedAt) ? ' · last reviewed ' + new Date(cards.find(c => c.lastReviewedAt)!.lastReviewedAt!).toLocaleDateString() : ' · not yet reviewed'}
                       </div>
@@ -471,13 +559,13 @@ export default function BookDetailModal({
                       <button
                         onClick={() => onStudy({ chapterHref: href })}
                         style={{
-                          background: '#1A1917',
+                          background: 'var(--accent)',
                           border: 'none',
                           borderRadius: 5,
                           padding: '4px 10px',
                           fontFamily: '"DM Sans", system-ui, sans-serif',
                           fontSize: 9,
-                          color: '#fff',
+                          color: '#FFFFFF',
                           cursor: 'pointer',
                         }}
                       >Review</button>
@@ -494,15 +582,15 @@ export default function BookDetailModal({
                   <p style={{ ...labelStyle, margin: 0 }}>Scratchpad</p>
                 </div>
                 <div style={{
-                  background: '#FEFDF9',
-                  border: '1px solid #EAE7E1',
+                  background: 'var(--bg-primary)',
+                  border: '1px solid var(--border)',
                   borderRadius: 8,
                   padding: '10px 12px',
                 }}>
                   <p style={{
                     fontFamily: '"DM Sans", system-ui, sans-serif',
                     fontSize: 11,
-                    color: '#6B6560',
+                    color: 'var(--text-secondary)',
                     margin: '0 0 6px',
                     lineHeight: 1.6,
                   }}>
@@ -517,7 +605,7 @@ export default function BookDetailModal({
                         padding: 0,
                         fontFamily: '"DM Sans", system-ui, sans-serif',
                         fontSize: 10,
-                        color: '#C4A882',
+                        color: 'var(--accent-warm)',
                         cursor: 'pointer',
                       }}
                     >Open in reader →</button>
@@ -539,12 +627,12 @@ export default function BookDetailModal({
                       title="Export as Markdown"
                       style={{
                         background: 'none',
-                        border: '1px solid #D8D4CD',
+                        border: '1px solid var(--border)',
                         borderRadius: 6,
                         padding: '4px 10px',
                         fontFamily: '"DM Sans", system-ui, sans-serif',
                         fontSize: 11,
-                        color: '#8A8680',
+                        color: 'var(--text-secondary)',
                         cursor: 'pointer',
                       }}
                     >↗ MD</button>
@@ -553,12 +641,12 @@ export default function BookDetailModal({
                       title="Export as JSON"
                       style={{
                         background: 'none',
-                        border: '1px solid #D8D4CD',
+                        border: '1px solid var(--border)',
                         borderRadius: 6,
                         padding: '4px 10px',
                         fontFamily: '"DM Sans", system-ui, sans-serif',
                         fontSize: 11,
-                        color: '#8A8680',
+                        color: 'var(--text-secondary)',
                         cursor: 'pointer',
                       }}
                     >↗ JSON</button>
@@ -571,8 +659,8 @@ export default function BookDetailModal({
                   <div style={{
                     width: 18,
                     height: 18,
-                    border: '2px solid #E8E5DF',
-                    borderTop: '2px solid #C4A882',
+                    border: '2px solid var(--border)',
+                    borderTop: '2px solid var(--accent-warm)',
                     borderRadius: '50%',
                     animation: 'spin 0.8s linear infinite',
                   }} />
@@ -581,7 +669,7 @@ export default function BookDetailModal({
                 <p style={{
                   fontFamily: '"DM Sans", system-ui, sans-serif',
                   fontSize: 13,
-                  color: '#B0ADA8',
+                  color: 'var(--text-tertiary)',
                   margin: 0,
                   lineHeight: 1.5,
                 }}>
@@ -605,8 +693,8 @@ export default function BookDetailModal({
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, y: 4 }}
                     style={{
-                      background: '#FEF2F2',
-                      border: '1px solid #FECACA',
+                      background: 'var(--error-bg)',
+                      border: '1px solid var(--error-border)',
                       borderRadius: 10,
                       padding: '14px 16px',
                     }}
@@ -614,7 +702,7 @@ export default function BookDetailModal({
                     <p style={{
                       fontFamily: '"DM Sans", system-ui, sans-serif',
                       fontSize: 13,
-                      color: '#7F1D1D',
+                      color: 'var(--error-text)',
                       margin: '0 0 12px',
                       lineHeight: 1.5,
                     }}>
@@ -625,7 +713,7 @@ export default function BookDetailModal({
                         onClick={handleDelete}
                         disabled={deleting}
                         style={{
-                          background: '#DC2626',
+                          background: 'var(--error)',
                           color: '#FFFFFF',
                           border: 'none',
                           borderRadius: 8,
@@ -643,12 +731,12 @@ export default function BookDetailModal({
                         onClick={() => setConfirmDelete(false)}
                         style={{
                           background: 'none',
-                          border: '1px solid #D8D4CD',
+                          border: '1px solid var(--border)',
                           borderRadius: 8,
                           padding: '7px 16px',
                           fontFamily: '"DM Sans", system-ui, sans-serif',
                           fontSize: 13,
-                          color: '#8A8680',
+                          color: 'var(--text-secondary)',
                           cursor: 'pointer',
                         }}
                       >
@@ -665,15 +753,15 @@ export default function BookDetailModal({
                     style={{ display: 'flex', gap: 10 }}
                   >
                     {book.status === 'active' ? (
-                      <button onClick={handleArchive} style={chipButton('#8A8680', '#F5F3F0', '#D8D4CD')}>
+                      <button onClick={handleArchive} style={chipButton('var(--text-secondary)', 'var(--bg-secondary)', 'var(--border)')}>
                         Archive
                       </button>
                     ) : (
-                      <button onClick={handleUnarchive} style={chipButton('#8A8680', '#F5F3F0', '#D8D4CD')}>
+                      <button onClick={handleUnarchive} style={chipButton('var(--text-secondary)', 'var(--bg-secondary)', 'var(--border)')}>
                         Move to library
                       </button>
                     )}
-                    <button onClick={() => setConfirmDelete(true)} style={chipButton('#DC2626', '#FFF5F5', '#FECACA')}>
+                    <button onClick={() => setConfirmDelete(true)} style={chipButton('var(--error)', 'var(--error-bg)', 'var(--error-border)')}>
                       Delete
                     </button>
                   </motion.div>
@@ -691,7 +779,7 @@ const labelStyle: React.CSSProperties = {
   fontFamily: '"DM Sans", system-ui, sans-serif',
   fontSize: 10,
   fontWeight: 700,
-  color: '#B0ADA8',
+  color: 'var(--text-tertiary)',
   letterSpacing: '0.1em',
   textTransform: 'uppercase',
   margin: '0 0 10px',
@@ -717,13 +805,13 @@ function StatRow({ label, value, warm }: { label: string; value: string; warm: b
       <span style={{
         fontFamily: '"DM Sans", system-ui, sans-serif',
         fontSize: 9,
-        color: '#8A8780',
+        color: 'var(--text-secondary)',
       }}>{label}</span>
       <span style={{
         fontFamily: '"DM Sans", system-ui, sans-serif',
         fontSize: 9,
         fontWeight: 600,
-        color: warm ? '#C4A882' : '#3a3733',
+        color: warm ? 'var(--accent-warm)' : 'var(--text-primary)',
       }}>{value}</span>
     </div>
   )
@@ -752,7 +840,7 @@ function NotesList({
             fontFamily: '"DM Sans", system-ui, sans-serif',
             fontSize: 10,
             fontWeight: 700,
-            color: '#C4A882',
+            color: 'var(--accent-warm)',
             letterSpacing: '0.1em',
             textTransform: 'uppercase',
             margin: '0 0 10px',
@@ -766,7 +854,7 @@ function NotesList({
                 onMouseEnter={() => setHoveredId(note.id)}
                 onMouseLeave={() => setHoveredId(null)}
                 style={{
-                  background: hoveredId === note.id ? '#F4F2EE' : '#FAFAF8',
+                  background: hoveredId === note.id ? 'var(--bg-secondary)' : 'var(--bg-primary)',
                   borderRadius: 8,
                   padding: '10px 12px',
                   display: 'flex',
@@ -781,7 +869,7 @@ function NotesList({
                     fontFamily: '"Lora", Georgia, serif',
                     fontSize: 13,
                     fontStyle: 'italic',
-                    color: '#6B6863',
+                    color: 'var(--text-secondary)',
                     margin: 0,
                     lineHeight: 1.55,
                   }}>"{note.quote}"</p>
@@ -790,7 +878,7 @@ function NotesList({
                   <p style={{
                     fontFamily: '"DM Sans", system-ui, sans-serif',
                     fontSize: 13,
-                    color: '#1A1917',
+                    color: 'var(--text-primary)',
                     margin: 0,
                     lineHeight: 1.5,
                   }}>{note.note}</p>
@@ -799,7 +887,7 @@ function NotesList({
                   <p style={{
                     fontFamily: '"DM Sans", system-ui, sans-serif',
                     fontSize: 11,
-                    color: '#C4A882',
+                    color: 'var(--accent-warm)',
                     margin: 0,
                   }}>{new Date(note.createdAt).toLocaleDateString()}</p>
                   {onNavigate && hoveredId === note.id && (
@@ -812,7 +900,7 @@ function NotesList({
                         cursor: 'pointer',
                         fontFamily: '"DM Sans", system-ui, sans-serif',
                         fontSize: 11,
-                        color: '#8A7A6A',
+                        color: 'var(--accent-warm)',
                         letterSpacing: '0.02em',
                       }}
                     >

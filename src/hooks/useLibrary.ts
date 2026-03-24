@@ -2,10 +2,11 @@ import { useState, useEffect, useCallback } from 'react'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { useUser } from '@clerk/clerk-react'
 import { listBooks, uploadBook, type Book } from '../services/bookService'
+import type { GetToken } from '../services/storageService'
 
 export type UploadState = 'idle' | 'uploading' | 'error'
 
-export function useLibrary(supabase: SupabaseClient) {
+export function useLibrary(supabase: SupabaseClient, getStorageToken: GetToken) {
   const { user } = useUser()
   const [books, setBooks] = useState<Book[]>([])
   const [loading, setLoading] = useState(true)
@@ -34,7 +35,7 @@ export function useLibrary(supabase: SupabaseClient) {
       setUploadState('uploading')
       setUploadError(null)
       try {
-        const book = await uploadBook(supabase, user.id, file)
+        const book = await uploadBook(supabase, getStorageToken, user.id, file)
         setBooks((prev) => [book, ...prev])
         setUploadState('idle')
         return book
@@ -49,7 +50,7 @@ export function useLibrary(supabase: SupabaseClient) {
         return null
       }
     },
-    [supabase, user],
+    [supabase, getStorageToken, user],
   )
 
   return { books, loading, uploadState, uploadError, upload, refresh }

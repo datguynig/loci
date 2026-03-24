@@ -1,8 +1,11 @@
 import { useState, useEffect, useCallback } from 'react'
 import type { FontSize, Theme, LayoutMode } from './useEpub'
 
+export type ColorScheme = 'library' | 'slate'
+
 export interface Preferences {
   theme: Theme
+  colorScheme: ColorScheme
   fontSize: FontSize
   layoutMode: LayoutMode
   highlightEnabled: boolean
@@ -13,6 +16,7 @@ const STORAGE_KEY = 'loci_preferences'
 
 const DEFAULTS: Preferences = {
   theme: 'light',
+  colorScheme: 'library',
   fontSize: 'md',
   layoutMode: 'scroll',
   highlightEnabled: true,

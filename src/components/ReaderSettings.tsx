@@ -148,6 +148,7 @@ export default function ReaderSettings({
             borderRadius: 10,
             boxShadow: '0 8px 32px rgba(0,0,0,0.14)',
             minWidth: 200,
+            maxWidth: 'min(260px, calc(100vw - 32px))',
             overflow: 'hidden',
           }}
         >

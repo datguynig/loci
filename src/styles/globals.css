@@ -6,37 +6,177 @@
   --font-ui: 'DM Sans', system-ui, sans-serif;
 }
 
-/* Raw CSS custom properties — used by both the shell UI and epub.js iframe injection */
+/*
+ * ─── LOCI COLOUR SYSTEM ──────────────────────────────────────────────────────
+ *
+ * Two themes, each with light + dark variants = 4 combinations.
+ *
+ *   Library  — deep forest green + antique paper + aged gold
+ *   Slate    — ink near-black + warm cream + copper
+ *
+ * Applied via:
+ *   data-theme="dark"               (light/dark toggle)
+ *   data-color-scheme="slate"       (palette toggle; omit for Library default)
+ *
+ * All semantic error tokens are theme-neutral and live in the
+ * base :root / [data-theme="dark"] selectors.
+ * ─────────────────────────────────────────────────────────────────────────────
+ */
+
+/* ═══════════════════════════════════════════════════════════
+   LIBRARY — Light  (default)
+   ═══════════════════════════════════════════════════════════ */
 :root {
-  --bg-primary: #F8F7F4;
-  --bg-secondary: #EFEDE8;
-  --bg-surface: #FFFFFF;
-  --bg-surface-rgb: 255, 255, 255;
-  --text-primary: #1A1A1A;
-  --text-secondary: #6B6560;
-  --text-tertiary: #B0ACA6;
-  --accent: #1A1A1A;
-  --accent-warm: #C4A882;
-  --border: rgba(0, 0, 0, 0.08);
-  --shadow: rgba(0, 0, 0, 0.06);
+  /* Backgrounds */
+  --bg-primary:     #F7F2E7;   /* antique paper */
+  --bg-secondary:   #EDE6D0;   /* deeper paper */
+  --bg-surface:     #FDFBF5;   /* near-white with warmth */
+  --bg-surface-rgb: 253, 251, 245;
+
+  /* Text */
+  --text-primary:   #1A150E;   /* rich warm near-black */
+  --text-secondary: #5A5040;   /* warm brown-gray */
+  --text-tertiary:  #A09070;   /* muted warm stone */
+
+  /* Accent — deep leaf green */
+  --accent:         #1D6B48;
+  --accent-subtle:  rgba(29, 107, 72, 0.08);
+
+  /* Accent warm — aged gold */
+  --accent-warm:           #B8952A;
+  --accent-warm-highlight: rgba(184, 149, 42, 0.25);
+
+  /* Borders & shadows */
+  --border: rgba(29, 107, 72, 0.12);
+  --shadow: rgba(26, 21, 14, 0.08);
+
+  /* Cover placeholder gradient */
+  --cover-empty-gradient: linear-gradient(145deg, #EDE6D0 0%, #D8CEB8 100%);
+
+  /* ── Semantic: error states (shared across both themes) ── */
+  --error:        #DC2626;
+  --error-bg:     #FEF2F2;
+  --error-border: #FECACA;
+  --error-text:   #7F1D1D;
+
+  /* Fonts */
   --font-display: 'Playfair Display', Georgia, serif;
   --font-reading: 'Lora', Georgia, serif;
-  --font-ui: 'DM Sans', system-ui, sans-serif;
+  --font-ui:      'DM Sans', system-ui, sans-serif;
 }
 
+/* ═══════════════════════════════════════════════════════════
+   LIBRARY — Dark
+   ═══════════════════════════════════════════════════════════ */
 [data-theme="dark"] {
-  --bg-primary: #111110;
-  --bg-secondary: #1C1C1A;
-  --bg-surface: #242422;
-  --bg-surface-rgb: 36, 36, 34;
-  --text-primary: #F0EDE8;
-  --text-secondary: #8A8780;
-  --text-tertiary: #4A4845;
-  --accent: #F0EDE8;
-  --accent-warm: #C4A882;
-  --border: rgba(255, 255, 255, 0.07);
-  --shadow: rgba(0, 0, 0, 0.3);
+  /* Backgrounds — near-black with a green whisper, not green-dominant */
+  --bg-primary:     #0A0D0B;   /* near-black, faint green undertone */
+  --bg-secondary:   #111510;   /* slightly elevated, green barely perceptible */
+  --bg-surface:     #172019;   /* card/surface — green tint begins to show */
+  --bg-surface-rgb: 23, 32, 25;
+
+  /* Text */
+  --text-primary:   #EDE8D5;   /* warm cream — never pure white */
+  --text-secondary: #9A9078;   /* muted warm stone */
+  --text-tertiary:  #3E4840;   /* dark muted, slight green cast */
+
+  /* Accent — bright leaf green for dark background */
+  --accent:        #4DAA7A;
+  --accent-subtle: rgba(77, 170, 122, 0.12);
+
+  /* Accent warm — brighter gold for dark background */
+  --accent-warm:           #D4AE4A;
+  --accent-warm-highlight: rgba(212, 174, 74, 0.25);
+
+  /* Borders & shadows */
+  --border: rgba(77, 170, 122, 0.15);
+  --shadow: rgba(0, 0, 0, 0.5);
+
+  /* Cover placeholder gradient */
+  --cover-empty-gradient: linear-gradient(145deg, #172019 0%, #1F2D22 100%);
+
+  /* ── Semantic: error states (dark variants) ── */
+  --error:        #F87171;
+  --error-bg:     #2D1215;
+  --error-border: #7F1D1D;
+  --error-text:   #FCA5A5;
 }
+
+/* ═══════════════════════════════════════════════════════════
+   SLATE — Light
+   ═══════════════════════════════════════════════════════════ */
+[data-color-scheme="slate"] {
+  /* Backgrounds */
+  --bg-primary:     #FAFAF8;   /* warm near-white */
+  --bg-secondary:   #F2F1EE;   /* warm light gray */
+  --bg-surface:     #FFFFFF;
+  --bg-surface-rgb: 255, 255, 255;
+
+  /* Text */
+  --text-primary:   #1C1B18;   /* warm near-black */
+  --text-secondary: #6B645A;   /* warm stone gray */
+  --text-tertiary:  #A09788;   /* warm taupe */
+
+  /* Accent — rich copper */
+  --accent:        #B5622A;
+  --accent-subtle: rgba(181, 98, 42, 0.08);
+
+  /* Accent warm — slightly brighter copper for highlights */
+  --accent-warm:           #C8751E;
+  --accent-warm-highlight: rgba(200, 117, 30, 0.25);
+
+  /* Borders & shadows */
+  --border: rgba(181, 98, 42, 0.12);
+  --shadow: rgba(28, 27, 24, 0.08);
+
+  /* Cover placeholder gradient */
+  --cover-empty-gradient: linear-gradient(145deg, #F2F1EE 0%, #E4E0D8 100%);
+
+  /* Error tokens stay the same */
+  --error:        #DC2626;
+  --error-bg:     #FEF2F2;
+  --error-border: #FECACA;
+  --error-text:   #7F1D1D;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   SLATE — Dark
+   ═══════════════════════════════════════════════════════════ */
+[data-color-scheme="slate"][data-theme="dark"] {
+  /* Backgrounds */
+  --bg-primary:     #0F0E0C;   /* ink near-black */
+  --bg-secondary:   #1A1916;   /* dark warm gray */
+  --bg-surface:     #232220;   /* dark surface */
+  --bg-surface-rgb: 35, 34, 32;
+
+  /* Text */
+  --text-primary:   #F0EDE5;   /* warm off-white */
+  --text-secondary: #8A8278;   /* warm stone */
+  --text-tertiary:  #4A4640;   /* dark stone */
+
+  /* Accent — bright copper for dark background */
+  --accent:        #D0773A;
+  --accent-subtle: rgba(208, 119, 58, 0.12);
+
+  /* Accent warm — warm bright copper */
+  --accent-warm:           #E0894A;
+  --accent-warm-highlight: rgba(224, 137, 74, 0.25);
+
+  /* Borders & shadows */
+  --border: rgba(208, 119, 58, 0.15);
+  --shadow: rgba(0, 0, 0, 0.5);
+
+  /* Cover placeholder gradient */
+  --cover-empty-gradient: linear-gradient(145deg, #232220 0%, #2D2A26 100%);
+
+  /* Error tokens (dark variants) */
+  --error:        #F87171;
+  --error-bg:     #2D1215;
+  --error-border: #7F1D1D;
+  --error-text:   #FCA5A5;
+}
+
+/* ─────────────────────────────────────────────────────────── */
 
 *,
 *::before,
@@ -107,17 +247,17 @@ body {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: var(--border);
+  background: var(--text-tertiary);
   border-radius: 3px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: var(--text-tertiary);
+  background: var(--text-secondary);
 }
 
 /* Focus visible outline */
 :focus-visible {
-  outline: 2px solid var(--accent-warm);
+  outline: 2px solid var(--accent);
   outline-offset: 2px;
 }
 

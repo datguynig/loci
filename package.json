@@ -12,7 +12,8 @@
     "test:coverage": "vitest run tests/unit --coverage",
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",
-    "test:all": "vitest run tests/unit && playwright test"
+    "test:all": "vitest run tests/unit && playwright test",
+    "generate:voices": "node scripts/generateVoiceDemos.mjs"
   },
   "dependencies": {
     "@clerk/clerk-react": "^5.61.4",

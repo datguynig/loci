@@ -4,10 +4,21 @@ import { SignedIn, SignedOut, useAuth, useUser } from '@clerk/clerk-react'
 import Library from './components/Library'
 import Reader from './components/Reader'
 import Landing from './components/Landing'
+import PrivacyPolicy from './components/legal/PrivacyPolicy'
+import TermsOfService from './components/legal/TermsOfService'
 import { usePreferences } from './hooks/usePreferences'
 import { createSupabaseClient } from './services/supabaseClient'
 import { syncPreferencesFromSupabase, pushPreferencesToSupabase } from './services/preferencesService'
 import type { FontSize, LayoutMode } from './hooks/useEpub'
+
+type LegalPage = 'terms' | 'privacy'
+
+function parseLegalHash(): LegalPage | null {
+  const h = window.location.hash
+  if (h === '#terms') return 'terms'
+  if (h === '#privacy') return 'privacy'
+  return null
+}
 
 // ─── E2E Test Mode ─────────────────────────────────────────────────────────
 // When VITE_E2E_TEST=true (Playwright), we bypass Clerk auth and Supabase so
@@ -20,6 +31,14 @@ function E2EApp() {
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', prefs.theme)
   }, [prefs.theme])
+
+  useEffect(() => {
+    if (prefs.colorScheme === 'slate') {
+      document.documentElement.setAttribute('data-color-scheme', 'slate')
+    } else {
+      document.documentElement.removeAttribute('data-color-scheme')
+    }
+  }, [prefs.colorScheme])
 
   const handleThemeToggle = useCallback(() => {
     set('theme', prefs.theme === 'light' ? 'dark' : 'light')
@@ -86,6 +105,10 @@ function AppContent() {
     [], // eslint-disable-line react-hooks/exhaustive-deps
   )
 
+  // Raw Clerk JWT for the storage API (no Supabase template — the presign-api
+  // verifies against Clerk JWKS directly).
+  const getStorageToken = useCallback(() => getTokenRef.current(), [getToken]) // eslint-disable-line react-hooks/exhaustive-deps
+
   // Sync preferences from Supabase on sign-in (once per session)
   const syncedRef = useRef(false)
   useEffect(() => {
@@ -108,6 +131,14 @@ function AppContent() {
     document.documentElement.setAttribute('data-theme', prefs.theme)
   }, [prefs.theme])
 
+  useEffect(() => {
+    if (prefs.colorScheme === 'slate') {
+      document.documentElement.setAttribute('data-color-scheme', 'slate')
+    } else {
+      document.documentElement.removeAttribute('data-color-scheme')
+    }
+  }, [prefs.colorScheme])
+
   const handleOpenBook = useCallback((file: File, bookId?: string, studyOptions?: { panel?: 'scratchpad'; chapterHref?: string }) => {
     setOpenBook({ file, bookId: bookId ?? null, studyOptions })
   }, [])
@@ -116,10 +147,14 @@ function AppContent() {
     set('theme', prefs.theme === 'light' ? 'dark' : 'light')
   }, [prefs.theme, set])
 
+  const handleColorSchemeToggle = useCallback(() => {
+    set('colorScheme', prefs.colorScheme === 'library' ? 'slate' : 'library')
+  }, [prefs.colorScheme, set])
+
   return (
     <AnimatePresence mode="wait">
       {!openBook ? (
-        <Library key="library" supabase={supabase} onOpenBook={handleOpenBook} theme={prefs.theme} onThemeToggle={handleThemeToggle} />
+        <Library key="library" supabase={supabase} getStorageToken={getStorageToken} onOpenBook={handleOpenBook} theme={prefs.theme} onThemeToggle={handleThemeToggle} colorScheme={prefs.colorScheme} onColorSchemeToggle={handleColorSchemeToggle} />
       ) : (
         <Reader
           key="reader"
@@ -145,6 +180,20 @@ function AppContent() {
 }
 
 export default function App() {
+  const [legalPage, setLegalPage] = useState<LegalPage | null>(parseLegalHash)
+
+  // Listen for hash changes so <a href="#terms"> links work from anywhere
+  useEffect(() => {
+    const handler = () => setLegalPage(parseLegalHash())
+    window.addEventListener('hashchange', handler)
+    return () => window.removeEventListener('hashchange', handler)
+  }, [])
+
+  const closeLegal = () => {
+    window.location.hash = ''
+    setLegalPage(null)
+  }
+
   if (import.meta.env.VITE_E2E_TEST === 'true') return <E2EApp />
 
   return (
@@ -155,6 +204,18 @@ export default function App() {
       <SignedIn>
         <AppContent />
       </SignedIn>
+
+      {/* Legal pages render as a full-screen overlay, visible regardless of auth state */}
+      {legalPage === 'privacy' && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 500, overflowY: 'auto', background: 'var(--bg-primary)' }}>
+          <PrivacyPolicy onBack={closeLegal} />
+        </div>
+      )}
+      {legalPage === 'terms' && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 500, overflowY: 'auto', background: 'var(--bg-primary)' }}>
+          <TermsOfService onBack={closeLegal} />
+        </div>
+      )}
     </>
   )
 }

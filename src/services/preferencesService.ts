@@ -7,6 +7,7 @@ export async function syncPreferencesFromSupabase(supabase: SupabaseClient): Pro
   const local = loadPreferences()
   const merged: Preferences = {
     theme: data.theme ?? local.theme,
+    colorScheme: local.colorScheme,
     fontSize: data.font_size ?? local.fontSize,
     layoutMode: data.layout_mode ?? local.layoutMode,
     highlightEnabled: data.highlight_enabled ?? local.highlightEnabled,

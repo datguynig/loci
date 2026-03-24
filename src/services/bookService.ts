@@ -1,5 +1,12 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import ePub from 'epubjs'
+import {
+  uploadFile,
+  downloadFile,
+  getCoverPublicUrl,
+  deleteFiles,
+  type GetToken,
+} from './storageService'
 
 export interface Book {
   id: string
@@ -65,6 +72,7 @@ async function extractCover(file: File): Promise<Blob | null> {
 
 export async function uploadBook(
   supabase: SupabaseClient,
+  getStorageToken: GetToken,
   userId: string,
   file: File,
 ): Promise<Book> {
@@ -88,20 +96,16 @@ export async function uploadBook(
   const bookId: string = row.id
   const filePath = `${userId}/${bookId}.epub`
 
-  const { error: uploadError } = await supabase.storage
-    .from('books')
-    .upload(filePath, file, { contentType: 'application/epub+zip', upsert: true })
-  if (uploadError) throw uploadError
+  await uploadFile(getStorageToken, 'books', filePath, file, 'application/epub+zip')
 
   let coverUrl: string | null = null
   if (coverBlob) {
     const coverPath = `${userId}/${bookId}.jpg`
-    const { error: coverError } = await supabase.storage
-      .from('covers')
-      .upload(coverPath, coverBlob, { contentType: 'image/jpeg', upsert: true })
-    if (!coverError) {
-      const { data: pub } = supabase.storage.from('covers').getPublicUrl(coverPath)
-      coverUrl = pub.publicUrl
+    try {
+      await uploadFile(getStorageToken, 'covers', coverPath, coverBlob, 'image/jpeg')
+      coverUrl = getCoverPublicUrl(coverPath)
+    } catch {
+      // Cover upload failure is non-fatal — book still accessible without cover
     }
   }
 
@@ -116,10 +120,9 @@ export async function uploadBook(
   return toBook(updated)
 }
 
-export async function getBookFile(supabase: SupabaseClient, book: Book): Promise<File> {
-  const { data, error } = await supabase.storage.from('books').download(book.filePath)
-  if (error) throw error
-  return new File([data], `${book.title}.epub`, { type: 'application/epub+zip' })
+export async function getBookFile(getStorageToken: GetToken, book: Book): Promise<File> {
+  const blob = await downloadFile(getStorageToken, 'books', book.filePath)
+  return new File([blob], `${book.title}.epub`, { type: 'application/epub+zip' })
 }
 
 export async function markLastRead(supabase: SupabaseClient, bookId: string): Promise<void> {
@@ -136,11 +139,14 @@ export async function unarchiveBook(supabase: SupabaseClient, bookId: string): P
   if (error) throw error
 }
 
-export async function deleteBook(supabase: SupabaseClient, book: Book): Promise<void> {
-  await supabase.storage.from('books').remove([book.filePath])
+export async function deleteBook(
+  supabase: SupabaseClient,
+  getStorageToken: GetToken,
+  book: Book,
+): Promise<void> {
+  await deleteFiles(getStorageToken, 'books', [book.filePath])
   if (book.coverUrl) {
-    const coverPath = `${book.userId}/${book.id}.jpg`
-    await supabase.storage.from('covers').remove([coverPath])
+    await deleteFiles(getStorageToken, 'covers', [`${book.userId}/${book.id}.jpg`])
   }
   const { error } = await supabase.from('books').delete().eq('id', book.id)
   if (error) throw error

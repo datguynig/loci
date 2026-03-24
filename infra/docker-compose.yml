@@ -1,0 +1,41 @@
+services:
+  minio:
+    image: minio/minio:latest
+    command: server /data --console-address ":9001"
+    volumes:
+      - ./data:/data
+    env_file: .env
+    restart: unless-stopped
+    networks:
+      - loci-net
+      - openclaw-p9is_default
+    labels:
+      - traefik.enable=true
+      - traefik.docker.network=openclaw-p9is_default
+      - traefik.http.routers.loci-minio.rule=Host(`minio.loci.app`)
+      - traefik.http.routers.loci-minio.entrypoints=websecure
+      - traefik.http.routers.loci-minio.tls.certresolver=letsencrypt
+      - traefik.http.services.loci-minio.loadbalancer.server.port=9000
+
+  presign-api:
+    build: ./api
+    env_file: .env
+    restart: unless-stopped
+    networks:
+      - loci-net
+      - openclaw-p9is_default
+    depends_on:
+      - minio
+    labels:
+      - traefik.enable=true
+      - traefik.docker.network=openclaw-p9is_default
+      - traefik.http.routers.loci-storage-api.rule=Host(`api-storage.loci.app`)
+      - traefik.http.routers.loci-storage-api.entrypoints=websecure
+      - traefik.http.routers.loci-storage-api.tls.certresolver=letsencrypt
+      - traefik.http.services.loci-storage-api.loadbalancer.server.port=3100
+
+networks:
+  loci-net:
+    driver: bridge
+  openclaw-p9is_default:
+    external: true
