@@ -197,7 +197,9 @@ export default function Reader({
 
   const { clearSentenceHighlight } = epub
   const { stop: stopSpeech, speak: speakSpeech, pause: pauseSpeech, resume: resumeSpeech,
-          isPlaying: speechIsPlaying, isPaused: speechIsPaused } = speech
+          isPlaying: speechIsPlaying, isPaused: speechIsPaused,
+          sentences: speechSentences, currentSentenceIndex: speechCurrentSentenceIndex,
+          skipForward: skipForwardSpeech, skipBack: skipBackSpeech } = speech
 
   const handleNextPage = useCallback(() => {
     stopSpeech()
@@ -241,12 +243,12 @@ export default function Reader({
   const { highlightSentence } = epub
   useEffect(() => {
     if (speechIsPlaying && !speechIsPaused) {
-      const sentence = speech.sentences[speech.currentSentenceIndex]
+      const sentence = speechSentences[speechCurrentSentenceIndex]
       if (sentence) highlightSentence(sentence)
     } else {
       clearSentenceHighlight()
     }
-  }, [speech.currentSentenceIndex, speechIsPlaying, speechIsPaused, highlightSentence, clearSentenceHighlight])
+  }, [speechCurrentSentenceIndex, speechSentences, speechIsPlaying, speechIsPaused, highlightSentence, clearSentenceHighlight])
 
   // Re-apply annotation underlines whenever the chapter changes
   const { applyAnnotationHighlights, setOnTextSelected, currentHref } = epub
@@ -1169,8 +1171,8 @@ export default function Reader({
         onPause={pauseSpeech}
         onResume={resumeSpeech}
         onStop={stopSpeech}
-        onSkipForward={speech.skipForward}
-        onSkipBack={speech.skipBack}
+        onSkipForward={skipForwardSpeech}
+        onSkipBack={skipBackSpeech}
         fontSize={fontSize}
         onFontSizeChange={onFontSizeChange}
         layoutMode={layoutMode}
