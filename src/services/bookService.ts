@@ -158,9 +158,15 @@ export async function deleteBook(
   getStorageToken: GetToken,
   book: Book,
 ): Promise<void> {
+  // If file_path is still 'pending', the DB update after upload failed mid-flight.
+  // Derive the expected MinIO key so cleanup can still proceed (DeleteObjects is
+  // a no-op for keys that don't exist, so this is safe either way).
+  const effectiveFilePath =
+    book.filePath === 'pending' ? `${book.userId}/${book.id}.epub` : book.filePath
+
   // Delete storage files in parallel
   await Promise.all([
-    deleteFiles(getStorageToken, 'books', [book.filePath]),
+    deleteFiles(getStorageToken, 'books', [effectiveFilePath]),
     book.coverUrl
       ? deleteFiles(getStorageToken, 'covers', [`${book.userId}/${book.id}.jpg`])
       : Promise.resolve(),
