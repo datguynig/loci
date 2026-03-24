@@ -52,6 +52,7 @@ export default function BookDetailModal({
   const [reviewFocused, setReviewFocused] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [deleting, setDeleting] = useState(false)
+  const [deleteError, setDeleteError] = useState<string | null>(null)
   const [flashcards, setFlashcards] = useState<Flashcard[]>([])
   const [scratchpadPreview, setScratchpadPreview] = useState('')
   const [quizSessions, setQuizSessions] = useState<QuizSession[]>([])
@@ -103,6 +104,7 @@ export default function BookDetailModal({
 
   const handleDelete = async () => {
     setDeleting(true)
+    setDeleteError(null)
     try {
       await deleteBook(supabase, getStorageToken, book)
       onDelete(book)
@@ -110,7 +112,7 @@ export default function BookDetailModal({
     } catch (err) {
       console.error('Delete failed', err)
       setDeleting(false)
-      setConfirmDelete(false)
+      setDeleteError(err instanceof Error ? err.message : 'Failed to delete book. Please try again.')
     }
   }
 
@@ -728,7 +730,7 @@ export default function BookDetailModal({
                         {deleting ? 'Deleting…' : 'Delete permanently'}
                       </button>
                       <button
-                        onClick={() => setConfirmDelete(false)}
+                        onClick={() => { setConfirmDelete(false); setDeleteError(null) }}
                         style={{
                           background: 'none',
                           border: '1px solid var(--border)',
@@ -767,6 +769,17 @@ export default function BookDetailModal({
                   </motion.div>
                 )}
               </AnimatePresence>
+              {deleteError && (
+                <p style={{
+                  fontFamily: '"DM Sans", system-ui, sans-serif',
+                  fontSize: 12,
+                  color: 'var(--error)',
+                  margin: '8px 0 0',
+                  lineHeight: 1.4,
+                }}>
+                  {deleteError}
+                </p>
+              )}
             </div>
           </div>
         </div>

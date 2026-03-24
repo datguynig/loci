@@ -96,7 +96,13 @@ export async function uploadBook(
   const bookId: string = row.id
   const filePath = `${userId}/${bookId}.epub`
 
-  await uploadFile(getStorageToken, 'books', filePath, file, 'application/epub+zip')
+  try {
+    await uploadFile(getStorageToken, 'books', filePath, file, 'application/epub+zip')
+  } catch (uploadErr) {
+    // Clean up the pending DB row so the user can retry cleanly
+    await supabase.from('books').delete().eq('id', bookId)
+    throw uploadErr
+  }
 
   let coverUrl: string | null = null
   if (coverBlob) {
@@ -115,7 +121,15 @@ export async function uploadBook(
     .eq('id', bookId)
     .select()
     .single()
-  if (updateError) throw updateError
+  if (updateError) {
+    // Clean up storage and pending row so the user can retry cleanly
+    await Promise.allSettled([
+      deleteFiles(getStorageToken, 'books', [filePath]),
+      coverUrl ? deleteFiles(getStorageToken, 'covers', [`${userId}/${bookId}.jpg`]) : Promise.resolve(),
+      supabase.from('books').delete().eq('id', bookId),
+    ])
+    throw updateError
+  }
 
   return toBook(updated)
 }
@@ -144,10 +158,31 @@ export async function deleteBook(
   getStorageToken: GetToken,
   book: Book,
 ): Promise<void> {
-  await deleteFiles(getStorageToken, 'books', [book.filePath])
-  if (book.coverUrl) {
-    await deleteFiles(getStorageToken, 'covers', [`${book.userId}/${book.id}.jpg`])
-  }
+  // Delete storage files in parallel
+  await Promise.all([
+    deleteFiles(getStorageToken, 'books', [book.filePath]),
+    book.coverUrl
+      ? deleteFiles(getStorageToken, 'covers', [`${book.userId}/${book.id}.jpg`])
+      : Promise.resolve(),
+  ])
+
+  // Delete related rows that may not have ON DELETE CASCADE (annotations, reading_progress, bookmarks).
+  // flashcards, scratchpad, and quiz_sessions have CASCADE on book_id so they clean up automatically,
+  // but deleting them explicitly here is safe and consistent.
+  const relatedTables = [
+    'annotations',
+    'reading_progress',
+    'bookmarks',
+    'flashcards',
+    'scratchpad',
+    'quiz_sessions',
+  ]
+  await Promise.all(
+    relatedTables.map((table) =>
+      supabase.from(table).delete().eq('book_id', book.id),
+    ),
+  )
+
   const { error } = await supabase.from('books').delete().eq('id', book.id)
   if (error) throw error
 }

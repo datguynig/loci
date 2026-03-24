@@ -169,7 +169,7 @@ export default function Library({ supabase, getStorageToken, onOpenBook, theme, 
         setOpeningId(null)
       }
     },
-    [supabase, onOpenBook],
+    [supabase, getStorageToken, onOpenBook],
   )
 
   const handleStudyBook = useCallback(
@@ -185,7 +185,7 @@ export default function Library({ supabase, getStorageToken, onOpenBook, theme, 
         setOpeningId(null)
       }
     },
-    [supabase, onOpenBook],
+    [supabase, getStorageToken, onOpenBook],
   )
 
   const dragProps = {
