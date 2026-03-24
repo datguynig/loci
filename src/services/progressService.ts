@@ -18,7 +18,7 @@ export async function loadProgress(
     .from('reading_progress')
     .select('*')
     .eq('book_id', bookId)
-    .single()
+    .maybeSingle()
   if (error || !data) return null
   return {
     userId: data.user_id,
