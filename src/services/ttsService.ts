@@ -21,28 +21,66 @@ export interface ElevenLabsVoice {
   labels?: Record<string, string>
 }
 
+export interface WordTiming {
+  word: string
+  startTime: number  // seconds into the audio
+  endTime: number
+}
+
+export interface TimestampedAudio {
+  audio: HTMLAudioElement
+  wordTimings: WordTiming[]
+}
+
 /**
  * Stream a single sentence via the configured TTS provider.
- * - ElevenLabs: returns an HTMLAudioElement that auto-plays and calls onEnd when done.
+ * - ElevenLabs: returns a TimestampedAudio with the audio element and word timings.
  * - Browser TTS: returns null; the caller (useSpeech) handles browser utterances directly.
  */
 export async function streamSentence(
   text: string,
   config: TTSConfig,
   onEnd: () => void,
-): Promise<HTMLAudioElement | null> {
+): Promise<TimestampedAudio | null> {
   if (config.provider === 'elevenlabs' && config.voiceId) {
-    return streamElevenLabs(text, config, onEnd)
+    return streamElevenLabsWithTimestamps(text, config, onEnd)
   }
 
   return null
 }
 
-async function streamElevenLabs(
+function buildWordTimings(alignment: {
+  characters: string[]
+  character_start_times_seconds: number[]
+  character_end_times_seconds: number[]
+}): WordTiming[] {
+  const words: WordTiming[] = []
+  let chars = ''
+  let startTime = 0
+  let endTime = 0
+
+  for (let i = 0; i < alignment.characters.length; i++) {
+    const ch = alignment.characters[i]
+    if (/\s/.test(ch)) {
+      if (chars.trim()) {
+        words.push({ word: chars.trim(), startTime, endTime })
+        chars = ''
+      }
+    } else {
+      if (!chars) startTime = alignment.character_start_times_seconds[i]
+      chars += ch
+      endTime = alignment.character_end_times_seconds[i]
+    }
+  }
+  if (chars.trim()) words.push({ word: chars.trim(), startTime, endTime })
+  return words
+}
+
+async function streamElevenLabsWithTimestamps(
   text: string,
   config: TTSConfig,
   onEnd: () => void,
-): Promise<HTMLAudioElement> {
+): Promise<TimestampedAudio> {
   const proxyUrl = getElevenLabsProxyUrl()
   const apiKey = getElevenLabsApiKey()
 
@@ -55,7 +93,7 @@ async function streamElevenLabs(
   const headers: Record<string, string> = { 'Content-Type': 'application/json' }
   if (!proxyUrl && apiKey) headers['xi-api-key'] = apiKey
 
-  const response = await fetch(`${baseUrl}/v1/text-to-speech/${config.voiceId}/stream`, {
+  const response = await fetch(`${baseUrl}/v1/text-to-speech/${config.voiceId}/with-timestamps`, {
     method: 'POST',
     headers,
     body: JSON.stringify({
@@ -79,7 +117,20 @@ async function streamElevenLabs(
     throw new Error(errorMessage)
   }
 
-  const blob = await response.blob()
+  const data = await response.json() as {
+    audio_base64: string
+    alignment: {
+      characters: string[]
+      character_start_times_seconds: number[]
+      character_end_times_seconds: number[]
+    }
+  }
+
+  // Decode base64 audio → Blob → HTMLAudioElement
+  const binaryStr = atob(data.audio_base64)
+  const bytes = new Uint8Array(binaryStr.length)
+  for (let i = 0; i < binaryStr.length; i++) bytes[i] = binaryStr.charCodeAt(i)
+  const blob = new Blob([bytes], { type: 'audio/mpeg' })
   const objectUrl = URL.createObjectURL(blob)
   const audio = new Audio(objectUrl)
 
@@ -94,7 +145,7 @@ async function streamElevenLabs(
   }
 
   await audio.play()
-  return audio
+  return { audio, wordTimings: buildWordTimings(data.alignment) }
 }
 
 export async function fetchElevenLabsVoices(): Promise<ElevenLabsVoice[]> {

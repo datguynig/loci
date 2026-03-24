@@ -60,6 +60,7 @@ export interface UseEpubReturn {
   searchBook: (query: string) => Promise<SearchResult[]>
   highlightSentence: (text: string) => void
   clearSentenceHighlight: () => void
+  highlightWord: (word: string) => void
   setOnTextSelected: (cb: ((quote: string, href: string, pos: { x: number; y: number }) => void) | null) => void
   applyAnnotationHighlights: (annotations: Annotation[]) => void
   isLoading: boolean
@@ -277,6 +278,7 @@ export function useEpub({ fontSize, theme, layoutMode, highlightEnabled = true, 
   const [error, setError] = useState<string | null>(null)
 
   const viewerRef = useRef<HTMLDivElement>(null)
+  const currentSentenceBlockRef = useRef<Element | null>(null)
   const onContentClickRef = useRef(onContentClick)
   onContentClickRef.current = onContentClick
   const onParagraphClickRef = useRef(onParagraphClick)
@@ -1349,10 +1351,15 @@ export function useEpub({ fontSize, theme, layoutMode, highlightEnabled = true, 
   }, [])
 
   const clearSentenceHighlight = useCallback(() => {
+    currentSentenceBlockRef.current = null
     const contents = renditionRef.current?.getContents() ?? []
     for (const c of contents) {
       const doc = c.document
       if (!doc) continue
+      // Unwrap word-level marks
+      doc.querySelectorAll('mark[data-loci-word]').forEach((mark) => {
+        mark.replaceWith(...Array.from(mark.childNodes))
+      })
       // Unwrap inline <mark> highlights by replacing with their children
       doc.querySelectorAll('mark[data-loci-reading]').forEach((mark) => {
         mark.replaceWith(...Array.from(mark.childNodes))
@@ -1395,6 +1402,9 @@ export function useEpub({ fontSize, theme, layoutMode, highlightEnabled = true, 
       for (const block of Array.from(blocks)) {
         const blockNorm = normalizeText(block.textContent ?? '')
         if (!prefixRe.test(blockNorm)) continue
+
+        // Track for word-level highlighting
+        currentSentenceBlockRef.current = block
 
         let scrollTarget: HTMLElement | null = null
 
@@ -1445,6 +1455,64 @@ export function useEpub({ fontSize, theme, layoutMode, highlightEnabled = true, 
       }
     }
   }, [clearSentenceHighlight, highlightEnabled, autoscrollEnabled])
+
+  const highlightWord = useCallback((word: string) => {
+    if (!word.trim()) return
+    const contents = renditionRef.current?.getContents() ?? []
+
+    for (const c of contents) {
+      const doc = c.document
+      if (!doc) continue
+
+      // Clear previous word mark
+      doc.querySelectorAll('mark[data-loci-word]').forEach((m) => {
+        m.replaceWith(...Array.from(m.childNodes))
+      })
+      doc.normalize()
+
+      // Scope search to the tracked sentence block; fall back to body
+      const root = currentSentenceBlockRef.current ?? doc.body
+      if (!root) continue
+
+      const normWord = normalizeText(word)
+      if (!normWord) continue
+      const wordRe = new RegExp(normWord.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i')
+
+      const walker = doc.createTreeWalker(root, NodeFilter.SHOW_TEXT)
+      let textNode: Text | null
+      while ((textNode = walker.nextNode() as Text | null)) {
+        const nodeNorm = normalizeText(textNode.textContent ?? '')
+        const m = nodeNorm.match(wordRe)
+        if (!m || m.index === undefined) continue
+
+        const mark = doc.createElement('mark')
+        mark.setAttribute('data-loci-word', 'true')
+        mark.style.cssText =
+          'background:rgba(196,168,130,0.6);border-radius:2px;color:inherit;padding:0 1px'
+        try {
+          const range = doc.createRange()
+          range.setStart(textNode, m.index)
+          range.setEnd(textNode, m.index + word.length)
+          range.surroundContents(mark)
+        } catch {
+          break  // range crosses element boundary — skip
+        }
+
+        // Scroll-on-demand: only move if the word has drifted out of the visible area
+        if (autoscrollEnabled) {
+          const win = doc.defaultView
+          if (win) {
+            const rect = mark.getBoundingClientRect()
+            const inView = rect.top >= 0 && rect.bottom <= win.innerHeight
+            if (!inView) {
+              mark.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
+            }
+          }
+        }
+        return
+      }
+    }
+  }, [autoscrollEnabled])
 
   const searchBook = useCallback(async (query: string): Promise<SearchResult[]> => {
     const b = bookRef.current
@@ -1543,6 +1611,7 @@ export function useEpub({ fontSize, theme, layoutMode, highlightEnabled = true, 
     searchBook,
     highlightSentence,
     clearSentenceHighlight,
+    highlightWord,
     setOnTextSelected,
     applyAnnotationHighlights,
     isLoading,

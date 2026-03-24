@@ -5,6 +5,7 @@ import {
   type TTSProvider,
   type ElevenLabsModel,
   type ElevenLabsVoice,
+  type WordTiming,
 } from '../services/ttsService'
 import { splitSentences, pickPreferredVoice, resolveTtsProvider, hasElevenLabs } from '../utils/tts'
 
@@ -35,6 +36,8 @@ export interface UseSpeechReturn {
   setRate: (r: number) => void
   currentSentenceIndex: number
   sentences: string[]
+  /** Current word being spoken (ElevenLabs only; empty string for browser TTS). */
+  currentWord: string
 }
 
 export function useSpeech(options?: { onEnded?: () => void }): UseSpeechReturn {
@@ -61,6 +64,10 @@ export function useSpeech(options?: { onEnded?: () => void }): UseSpeechReturn {
 
   // Shared
   const [rate, setRate] = useState(1.0)
+
+  const [currentWord, setCurrentWord] = useState('')
+  const wordTimingsRef = useRef<WordTiming[]>([])
+  const lastWordRef = useRef('')
 
   // Refs for stable callbacks (avoid stale closures in async loops)
   const currentAudioRef = useRef<HTMLAudioElement | null>(null)
@@ -150,8 +157,12 @@ export function useSpeech(options?: { onEnded?: () => void }): UseSpeechReturn {
       setCurrentSentenceIndex(idx)
       indexRef.current = idx
 
+      // Reset word tracking for the new sentence
+      setCurrentWord('')
+      lastWordRef.current = ''
+
       try {
-        const audio = await streamSentence(
+        const result = await streamSentence(
           sentencesRef.current[idx],
           {
             provider: 'elevenlabs',
@@ -164,7 +175,23 @@ export function useSpeech(options?: { onEnded?: () => void }): UseSpeechReturn {
             playElevenLabsSentence(idx + 1)
           }
         )
+        if (!result) {
+          playBrowserSentence(idx)
+          return
+        }
+        const { audio, wordTimings } = result
+        wordTimingsRef.current = wordTimings
         currentAudioRef.current = audio
+
+        // Track which word is being spoken via timeupdate (~4× per second)
+        audio.addEventListener('timeupdate', () => {
+          const t = audio.currentTime
+          const timing = wordTimings.find((w) => t >= w.startTime && t <= w.endTime + 0.05)
+          if (timing && timing.word !== lastWordRef.current) {
+            lastWordRef.current = timing.word
+            setCurrentWord(timing.word)
+          }
+        })
       } catch {
         // ElevenLabs failed — fall back to browser TTS for this sentence
         playBrowserSentence(idx)
@@ -254,6 +281,8 @@ export function useSpeech(options?: { onEnded?: () => void }): UseSpeechReturn {
     if (!isPlayingRef.current || isPausedRef.current) return
     isPausedRef.current = true
     setIsPaused(true)
+    setCurrentWord('')
+    lastWordRef.current = ''
 
     if (provider === 'elevenlabs') {
       currentAudioRef.current?.pause()
@@ -280,6 +309,8 @@ export function useSpeech(options?: { onEnded?: () => void }): UseSpeechReturn {
     setIsPlaying(false)
     setIsPaused(false)
     setCurrentSentenceIndex(0)
+    setCurrentWord('')
+    lastWordRef.current = ''
     indexRef.current = 0
 
     if (currentAudioRef.current) {
@@ -413,5 +444,6 @@ export function useSpeech(options?: { onEnded?: () => void }): UseSpeechReturn {
     setRate,
     currentSentenceIndex,
     sentences,
+    currentWord,
   }
 }

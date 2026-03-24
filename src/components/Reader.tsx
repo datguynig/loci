@@ -274,16 +274,25 @@ export default function Reader({
     if (text) speech.speak(text)
   }, [epub.hasRenderedContent, epub.currentHref, epub.getCurrentText, speech.speak])
 
-  // TTS reading highlight — glow the paragraph being spoken
-  const { highlightSentence } = epub
+  // TTS sentence highlight — sets the sentence block ref + visual for browser TTS
+  const { highlightSentence, highlightWord } = epub
   useEffect(() => {
     if (speech.isPlaying && !speech.isPaused) {
       const sentence = speech.sentences[speech.currentSentenceIndex]
+      // Always run highlightSentence: sets currentSentenceBlockRef for word-level search
+      // and provides sentence-scope background for both providers
       if (sentence) highlightSentence(sentence)
     } else {
       clearSentenceHighlight()
     }
   }, [speech.currentSentenceIndex, speech.isPlaying, speech.isPaused, highlightSentence, clearSentenceHighlight])
+
+  // Word-level highlight (ElevenLabs only) — fires on each timeupdate tick
+  useEffect(() => {
+    if (!speech.currentWord || !speech.isPlaying || speech.isPaused) return
+    if (speech.provider !== 'elevenlabs') return
+    highlightWord(speech.currentWord)
+  }, [speech.currentWord, speech.isPlaying, speech.isPaused, speech.provider, highlightWord])
 
   // Re-apply annotation underlines whenever the chapter changes
   const { applyAnnotationHighlights, setOnTextSelected, currentHref } = epub
