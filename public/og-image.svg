@@ -1,0 +1,51 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630" width="1200" height="630">
+  <!-- Background -->
+  <rect width="1200" height="630" fill="#1D6B48"/>
+
+  <!-- Subtle grid texture -->
+  <defs>
+    <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
+      <path d="M 40 0 L 0 0 0 40" fill="none" stroke="#F7F2E7" stroke-width="0.4" opacity="0.08"/>
+    </pattern>
+  </defs>
+  <rect width="1200" height="630" fill="url(#grid)"/>
+
+  <!-- Wordmark -->
+  <text
+    x="600" y="295"
+    font-family="Georgia, 'Times New Roman', serif"
+    font-size="160"
+    font-weight="400"
+    font-style="italic"
+    fill="#F7F2E7"
+    text-anchor="middle"
+    dominant-baseline="middle"
+    letter-spacing="-4"
+  >Loci</text>
+
+  <!-- Tagline -->
+  <text
+    x="600" y="390"
+    font-family="'Helvetica Neue', Arial, sans-serif"
+    font-size="28"
+    font-weight="300"
+    fill="#F7F2E7"
+    text-anchor="middle"
+    dominant-baseline="middle"
+    opacity="0.7"
+    letter-spacing="1"
+  >Read, Listen &amp; Study Any Book You Own</text>
+
+  <!-- URL -->
+  <text
+    x="600" y="560"
+    font-family="'Helvetica Neue', Arial, sans-serif"
+    font-size="20"
+    font-weight="400"
+    fill="#F7F2E7"
+    text-anchor="middle"
+    dominant-baseline="middle"
+    opacity="0.45"
+    letter-spacing="2"
+  >loci.app</text>
+</svg>

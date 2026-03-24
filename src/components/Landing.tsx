@@ -459,11 +459,13 @@ export default function Landing() {
   const { theme, toggle: toggleTheme } = useTheme()
   const windowWidth = useWindowWidth()
   const isMobile = windowWidth < 768
+  const [menuOpen, setMenuOpen] = useState(false)
 
   // Navigation background adapts to theme
   const navBg = theme === 'dark' ? 'rgba(17,17,16,0.92)' : 'rgba(248,247,244,0.92)'
 
   const scrollTo = (id: string) => {
+    setMenuOpen(false)
     document.getElementById(id)?.scrollIntoView({ behavior: 'smooth' })
   }
 
@@ -588,13 +590,88 @@ export default function Landing() {
               : <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
             }
           </button>
-          <button onClick={() => openSignIn()} style={{ background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'var(--font-ui)', fontSize: 13, color: 'var(--text-tertiary)', padding: '6px 12px' }}>Sign in</button>
-          <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }} onClick={() => openSignUp()}
-            style={{ background: 'var(--text-primary)', color: 'var(--bg-primary)', fontFamily: 'var(--font-ui)', fontSize: 13, fontWeight: 600, padding: '8px 18px', borderRadius: 8, border: 'none', cursor: 'pointer' }}>
-            Start free trial
-          </motion.button>
+          {!isMobile && (
+            <>
+              <button onClick={() => openSignIn()} style={{ background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'var(--font-ui)', fontSize: 13, color: 'var(--text-tertiary)', padding: '6px 12px' }}>Sign in</button>
+              <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }} onClick={() => openSignUp()}
+                style={{ background: 'var(--text-primary)', color: 'var(--bg-primary)', fontFamily: 'var(--font-ui)', fontSize: 13, fontWeight: 600, padding: '8px 18px', borderRadius: 8, border: 'none', cursor: 'pointer' }}>
+                Start free trial
+              </motion.button>
+            </>
+          )}
+          {isMobile && (
+            <button
+              onClick={() => setMenuOpen(o => !o)}
+              aria-label={menuOpen ? 'Close menu' : 'Open menu'}
+              aria-expanded={menuOpen}
+              style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '6px 8px', borderRadius: 6, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+            >
+              {menuOpen
+                ? <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                : <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><line x1="3" y1="7" x2="21" y2="7"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="17" x2="21" y2="17"/></svg>
+              }
+            </button>
+          )}
         </div>
       </nav>
+
+      {/* ── Mobile nav drawer ─────────────────────────────────────────────────── */}
+      <AnimatePresence>
+        {menuOpen && isMobile && (
+          <>
+            {/* Backdrop */}
+            <motion.div
+              key="backdrop"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.15 }}
+              onClick={() => setMenuOpen(false)}
+              style={{ position: 'fixed', inset: 0, zIndex: 98, background: 'rgba(0,0,0,0.35)' }}
+            />
+            {/* Drawer */}
+            <motion.div
+              key="drawer"
+              initial={{ opacity: 0, y: -8 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -8 }}
+              transition={{ duration: 0.18, ease: [0.25, 0.46, 0.45, 0.94] }}
+              style={{
+                position: 'fixed', top: 56, left: 0, right: 0, zIndex: 99,
+                background: navBg, backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)',
+                borderBottom: '1px solid var(--border)',
+                padding: '8px 0 16px',
+              }}
+            >
+              {[['How it works', 'how-it-works'], ['Pricing', 'pricing'], ['FAQ', 'faq']].map(([label, id]) => (
+                <button
+                  key={id}
+                  onClick={() => scrollTo(id)}
+                  style={{
+                    display: 'block', width: '100%', textAlign: 'left',
+                    background: 'none', border: 'none', cursor: 'pointer',
+                    fontFamily: 'var(--font-ui)', fontSize: 16, color: 'var(--text-primary)',
+                    padding: '14px 24px',
+                  }}
+                >
+                  {label}
+                </button>
+              ))}
+              <div style={{ height: 1, background: 'var(--border)', margin: '8px 24px' }} />
+              <div style={{ padding: '8px 24px 0', display: 'flex', flexDirection: 'column', gap: 10 }}>
+                <button onClick={() => { setMenuOpen(false); openSignIn() }}
+                  style={{ background: 'none', border: '1px solid var(--border)', cursor: 'pointer', fontFamily: 'var(--font-ui)', fontSize: 15, color: 'var(--text-primary)', padding: '12px 0', borderRadius: 8, width: '100%' }}>
+                  Sign in
+                </button>
+                <motion.button whileTap={{ scale: 0.98 }} onClick={() => { setMenuOpen(false); openSignUp() }}
+                  style={{ background: 'var(--text-primary)', color: 'var(--bg-primary)', fontFamily: 'var(--font-display)', fontStyle: 'italic', fontSize: 16, padding: '13px 0', borderRadius: 8, border: 'none', cursor: 'pointer', width: '100%' }}>
+                  Start free trial
+                </motion.button>
+              </div>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
 
       {/* ── 2. Hero ─────────────────────────────────────────────────────────── */}
       {isMobile ? (
