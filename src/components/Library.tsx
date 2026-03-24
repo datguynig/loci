@@ -141,6 +141,7 @@ export default function Library({ supabase, getStorageToken, onOpenBook, theme, 
   const [onboardingSkipped, setOnboardingSkipped] = useState(false)
   const [openingId, setOpeningId] = useState<string | null>(null)
   const [openingProgress, setOpeningProgress] = useState<number>(0)
+  const [openError, setOpenError] = useState<string | null>(null)
   const [isDragging, setIsDragging] = useState(false)
   const [archivedOpen, setArchivedOpen] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -166,10 +167,10 @@ export default function Library({ supabase, getStorageToken, onOpenBook, theme, 
         const file = await getBookFile(getStorageToken, book, setOpeningProgress)
         await markLastRead(supabase, book.id)
         onOpenBook(file, book.id)
-      } catch (err) {
-        console.error('Failed to open book', err)
+      } catch {
         setOpeningId(null)
         setOpeningProgress(0)
+        setOpenError('Failed to open book. Please try again.')
       }
     },
     [supabase, getStorageToken, onOpenBook],
@@ -184,10 +185,10 @@ export default function Library({ supabase, getStorageToken, onOpenBook, theme, 
         const file = await getBookFile(getStorageToken, book, setOpeningProgress)
         await markLastRead(supabase, book.id)
         onOpenBook(file, book.id, opts)
-      } catch (err) {
-        console.error('Failed to open book for study', err)
+      } catch {
         setOpeningId(null)
         setOpeningProgress(0)
+        setOpenError('Failed to open book. Please try again.')
       }
     },
     [supabase, getStorageToken, onOpenBook],
@@ -330,7 +331,7 @@ export default function Library({ supabase, getStorageToken, onOpenBook, theme, 
       />
 
       <main style={{ maxWidth: 1100, margin: '0 auto', padding: isMobile ? '24px 16px' : '40px 32px', flex: 1, width: '100%' }}>
-        {uploadError && (
+        {(uploadError || openError) && (
           <div style={{
             background: 'var(--error-bg)',
             border: '1px solid var(--error-border)',
@@ -340,8 +341,19 @@ export default function Library({ supabase, getStorageToken, onOpenBook, theme, 
             fontFamily: '"DM Sans", sans-serif',
             fontSize: 13,
             color: 'var(--error)',
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            gap: 8,
           }}>
-            {uploadError}
+            <span>{uploadError ?? openError}</span>
+            {openError && (
+              <button
+                onClick={() => setOpenError(null)}
+                style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--error)', padding: 0, lineHeight: 1 }}
+                aria-label="Dismiss"
+              >✕</button>
+            )}
           </div>
         )}
 

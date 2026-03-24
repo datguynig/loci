@@ -73,13 +73,16 @@ export default function Reader({
   const isMobile = windowWidth < 600
   // Chrome visibility (mobile tap-to-hide)
   const [chromeVisible, setChromeVisible] = useState(true)
+  const handleContentClick = useCallback(() => {
+    if (isMobile) setChromeVisible((v) => !v)
+  }, [isMobile])
   const epub = useEpub({
     fontSize,
     theme,
     layoutMode,
     highlightEnabled,
     autoscrollEnabled,
-    onContentClick: isMobile ? () => setChromeVisible((v) => !v) : undefined,
+    onContentClick: handleContentClick,
   })
 
   // Cross-chapter TTS: when a chapter ends naturally, advance and resume
