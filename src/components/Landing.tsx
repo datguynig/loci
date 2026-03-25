@@ -394,16 +394,16 @@ const FAQ_ITEMS = [
     a: 'EPUB only. Most ebooks from publishers and sources like Project Gutenberg are available in EPUB. Kindle files can be converted to EPUB using free tools like Calibre.',
   },
   {
-    q: 'How is Loci different from just copying text into ChatGPT?',
-    a: "You'd have to paste in chapter text every time — and it wouldn't know your highlights or notes. Loci already has your chapter, your highlights, and your notes. The study tools are built into the book.",
+    q: 'How is Loci different from other reading apps?',
+    a: "Loci is built around your own book collection — not a catalog you subscribe to. You bring your EPUB files; Loci handles the narration, study tools, and cross-device sync. Your library, your annotations, and your progress are yours.",
   },
   {
     q: 'How does narration work?',
-    a: 'Narration is included with every Pro subscription. Pick from multiple voices — one for speed, one for long sessions. Each sentence is highlighted in the text as it\'s spoken. No separate account required.',
+    a: "Loci Narration is included with every Reader and Scholar subscription. Reader includes Loci Narration with natural, lifelike voices. Scholar adds Loci Narration Pro — expressive, audiobook-quality voices. Each sentence is highlighted in the text as it's spoken.",
   },
   {
     q: 'What happens when the free trial ends?',
-    a: 'If you do not cancel before the 7-day trial ends, your subscription starts at $9/month. You can cancel anytime from your account settings — no waiting periods, no hoops.',
+    a: "After your 7-day trial you can choose Reader ($7.99/month or $79/year) or Scholar ($13.99/month or $139/year), or continue using Loci for free with up to 5 books and your device's built-in voice. No charge until you add a payment method.",
   },
 ]
 
@@ -812,7 +812,7 @@ export default function Landing() {
         </div>
       </section>
 
-      {/* ── 5. ElevenLabs section ───────────────────────────────────────────── */}
+      {/* ── 5. Narration section ────────────────────────────────────────────── */}
       <section style={{ background: 'var(--bg-secondary)', padding: isMobile ? '80px 0' : '100px 0', overflow: 'hidden' }}>
         {/* Header */}
         <div style={{ textAlign: 'center', padding: '0 24px', marginBottom: 48 }}>
@@ -1092,83 +1092,92 @@ export default function Landing() {
           <span style={labelStyle}>PRICING</span>
           <h2 style={{ ...h2Style, textAlign: 'center', margin: '12px 0 0' }}>Start free. Upgrade when you're ready.</h2>
         </motion.div>
-        <div style={{ maxWidth: 820, margin: '0 auto', display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: 20, alignItems: 'start' }}>
+        <div style={{ maxWidth: 960, margin: '0 auto', display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr 1fr', gap: 20, alignItems: 'start' }}>
           {/* Free card */}
           <motion.div
             initial={{ opacity: 0, y: 24 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ duration: 0.5 }}
-            style={{ background: 'var(--bg-surface)', border: '1px solid var(--border)', borderRadius: 20, padding: isMobile ? '32px 24px' : '40px 36px', textAlign: 'left', opacity: theme === 'dark' ? 0.6 : 0.85 }}
+            style={{ background: 'var(--bg-surface)', border: '1px solid var(--border)', borderRadius: 20, overflow: 'hidden', textAlign: 'left', opacity: theme === 'dark' ? 0.6 : 0.85 }}
           >
-            <div style={{ fontFamily: 'var(--font-ui)', fontSize: 11, letterSpacing: '0.1em', color: 'var(--text-tertiary)', fontWeight: 600, marginBottom: 16 }}>FREE</div>
-            <div style={{ display: 'flex', alignItems: 'flex-end', gap: 2, marginBottom: 6 }}>
-              <span style={{ fontFamily: 'var(--font-display)', fontSize: 22, color: 'var(--text-secondary)', marginBottom: 8 }}>$</span>
-              <span style={{ fontFamily: 'var(--font-display)', fontSize: 52, fontWeight: 700, color: 'var(--text-primary)', lineHeight: 1 }}>0</span>
+            <div style={{ padding: '20px 20px 16px', borderBottom: '1px solid var(--border)' }}>
+              <div style={{ fontFamily: 'var(--font-ui)', fontSize: 11, fontWeight: 700, textTransform: 'uppercase' as const, letterSpacing: '0.06em', opacity: 0.45, marginBottom: 6 }}>Loci</div>
+              <div style={{ fontFamily: 'var(--font-display)', fontSize: 30, fontWeight: 800, marginBottom: 2 }}>$0</div>
+              <div style={{ fontFamily: 'var(--font-ui)', fontSize: 13, opacity: 0.55 }}>Always free</div>
             </div>
-            <p style={{ fontFamily: 'var(--font-ui)', fontSize: 13, color: 'var(--text-tertiary)', margin: '0 0 28px' }}>No credit card. Ever.</p>
-            <ul style={{ listStyle: 'none', padding: 0, margin: '0 0 32px', display: 'flex', flexDirection: 'column', gap: 11 }}>
-              {[
-                'Unlimited ebook reading',
-                'Highlights and notes',
-                'Dark mode and font settings',
-              ].map((feature) => (
-                <li key={feature} style={{ fontFamily: 'var(--font-ui)', fontSize: 14, color: 'var(--text-secondary)', display: 'flex', alignItems: 'flex-start', gap: 10 }}>
-                  <span style={{ color: 'var(--accent-warm)', fontWeight: 700, flexShrink: 0 }}>✓</span>
-                  {feature}
-                </li>
-              ))}
-            </ul>
-            <motion.button whileHover={{ scale: 1.01 }} whileTap={{ scale: 0.98 }} onClick={() => openSignUp()}
-              style={{ background: 'transparent', color: 'var(--text-primary)', fontFamily: 'var(--font-ui)', fontSize: 14, fontWeight: 600, padding: '13px 24px', borderRadius: 10, border: '1.5px solid var(--border)', cursor: 'pointer', width: '100%', opacity: 0.8 }}>
-              Start reading free
-            </motion.button>
+            <div style={{ padding: '16px 20px 24px' }}>
+              <ul style={{ margin: 0, padding: '0 0 0 16px', fontFamily: 'var(--font-ui)', fontSize: 13, lineHeight: 2, opacity: 0.8 }}>
+                <li>5 books</li>
+                <li>Device voice (unlimited)</li>
+                <li>Bookmarks &amp; progress sync</li>
+                <li>Annotations &amp; highlights</li>
+              </ul>
+              <motion.button whileHover={{ scale: 1.01 }} whileTap={{ scale: 0.98 }} onClick={() => openSignUp()}
+                style={{ background: 'transparent', color: 'var(--text-primary)', fontFamily: 'var(--font-ui)', fontSize: 14, fontWeight: 600, padding: '11px 0', borderRadius: 10, border: '1.5px solid var(--border)', cursor: 'pointer', width: '100%', marginTop: 16, opacity: 0.8 }}>
+                Start reading free
+              </motion.button>
+            </div>
           </motion.div>
 
-          {/* Pro card */}
+          {/* Reader card */}
           <motion.div
-            initial={{ opacity: 0, y: 24 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ duration: 0.5, delay: 0.1 }}
-            style={{
-              background: 'var(--bg-surface)',
-              backgroundImage: 'linear-gradient(rgba(255,255,255,0.04), rgba(255,255,255,0.015))',
-              border: '1px solid var(--border)',
-              borderRadius: 20,
-              padding: isMobile ? '32px 24px' : '40px 36px',
-              textAlign: 'left',
-              boxShadow: theme === 'dark'
-                ? '0 0 0 1px rgba(212,174,74,0.12), 0 0 80px rgba(212,174,74,0.08), 0 40px 100px rgba(0,0,0,0.55)'
-                : '0 0 0 1px rgba(0,0,0,0.06), 0 24px 64px rgba(0,0,0,0.13)',
-              position: 'relative',
-              transform: isMobile ? 'none' : 'translateY(-14px)',
-            }}
+            initial={{ opacity: 0, y: 24 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ duration: 0.5, delay: 0.08 }}
+            style={{ background: 'var(--bg-surface)', border: '2px solid #2563eb', borderRadius: 20, overflow: 'hidden', textAlign: 'left' }}
           >
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
-                <div style={{ fontFamily: 'var(--font-ui)', fontSize: 12, letterSpacing: '0.1em', color: 'var(--accent-warm)', fontWeight: 700 }}>PRO</div>
-                <span style={{ fontFamily: 'var(--font-ui)', fontSize: 9, letterSpacing: '0.08em', fontWeight: 700, color: 'var(--accent-warm)', background: 'var(--accent-warm-highlight)', padding: '3px 8px', borderRadius: 4 }}>RECOMMENDED</span>
-              </div>
-              <div style={{ display: 'flex', alignItems: 'flex-end', gap: 4, marginBottom: 6 }}>
-                <span style={{ fontFamily: 'var(--font-display)', fontSize: 20, color: 'var(--text-secondary)', marginBottom: 10 }}>$</span>
-                <span style={{ fontFamily: 'var(--font-display)', fontSize: 52, fontWeight: 700, color: 'var(--text-primary)', lineHeight: 1 }}>9</span>
-                <span style={{ fontFamily: 'var(--font-ui)', fontSize: 14, color: 'var(--text-secondary)', marginBottom: 8 }}>/month</span>
-              </div>
-              <p style={{ fontFamily: 'var(--font-ui)', fontSize: 13, color: 'var(--text-tertiary)', margin: '0 0 28px' }}>Everything in Free, plus:</p>
-              <ul style={{ listStyle: 'none', padding: 0, margin: '0 0 32px', display: 'flex', flexDirection: 'column', gap: 11 }}>
-                {[
-                  'Natural narration — multiple voices',
-                  'Study assistant (summaries, quizzes, flashcards)',
-                  'Export your highlights and notes as plain text',
-                ].map((feature) => (
-                  <li key={feature} style={{ fontFamily: 'var(--font-ui)', fontSize: 14, color: 'var(--text-secondary)', display: 'flex', alignItems: 'flex-start', gap: 10 }}>
-                    <span style={{ color: 'var(--accent-warm)', fontWeight: 700, flexShrink: 0 }}>✓</span>
-                    {feature}
-                  </li>
-                ))}
+            <div style={{ padding: '20px 20px 16px', borderBottom: '1px solid var(--border)' }}>
+              <div style={{ fontFamily: 'var(--font-ui)', fontSize: 11, fontWeight: 700, textTransform: 'uppercase' as const, letterSpacing: '0.06em', color: '#2563eb', marginBottom: 6 }}>Loci Reader</div>
+              <div style={{ fontFamily: 'var(--font-display)', fontSize: 30, fontWeight: 800, color: '#2563eb', marginBottom: 2 }}>$7.99<span style={{ fontSize: 16, fontWeight: 500 }}>/mo</span></div>
+              <div style={{ fontFamily: 'var(--font-ui)', fontSize: 12, opacity: 0.6 }}>or $79/yr — Save 2 months</div>
+            </div>
+            <div style={{ padding: '16px 20px 24px' }}>
+              <ul style={{ margin: 0, padding: '0 0 0 16px', fontFamily: 'var(--font-ui)', fontSize: 13, lineHeight: 2, opacity: 0.8 }}>
+                <li>Unlimited books</li>
+                <li>Loci Narration — lifelike voices</li>
+                <li>Word-by-word highlighting</li>
+                <li>Multiple voice choices</li>
+                <li>Scratchpad</li>
               </ul>
-              <motion.button whileHover={{ scale: 1.02, boxShadow: '0 8px 24px rgba(0,0,0,0.15)' }} whileTap={{ scale: 0.98 }} onClick={() => openSignUp()}
-                style={{ background: 'var(--text-primary)', color: 'var(--bg-primary)', fontFamily: 'var(--font-display)', fontStyle: 'italic', fontSize: 16, padding: '15px 24px', borderRadius: 12, border: 'none', cursor: 'pointer', width: '100%', marginBottom: 10 }}>
-                Start 7-day free trial
+              <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }} onClick={() => openSignUp()}
+                style={{ background: '#2563eb', color: '#fff', fontFamily: 'var(--font-display)', fontStyle: 'italic' as const, fontSize: 15, padding: '13px 0', borderRadius: 10, border: 'none', cursor: 'pointer', width: '100%', marginTop: 16 }}>
+                Get started
               </motion.button>
-              <p style={{ fontFamily: 'var(--font-ui)', fontSize: 12, color: 'var(--text-tertiary)', margin: 0, textAlign: 'center' }}>No credit card required · cancel anytime</p>
+            </div>
+          </motion.div>
+
+          {/* Scholar card */}
+          <motion.div
+            initial={{ opacity: 0, y: 24 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ duration: 0.5, delay: 0.16 }}
+            style={{ background: 'var(--bg-surface)', border: '2px solid #7c3aed', borderRadius: 20, overflow: 'hidden', textAlign: 'left', position: 'relative' as const, transform: isMobile ? 'none' : 'translateY(-10px)' }}
+          >
+            <div style={{ position: 'absolute' as const, top: 0, right: 16, background: '#7c3aed', color: '#fff', fontSize: 9, fontWeight: 700, padding: '3px 10px', borderRadius: '0 0 8px 8px', letterSpacing: '0.04em', fontFamily: 'var(--font-ui)' }}>MOST POPULAR</div>
+            <div style={{ padding: '20px 20px 16px', borderBottom: '1px solid var(--border)' }}>
+              <div style={{ fontFamily: 'var(--font-ui)', fontSize: 11, fontWeight: 700, textTransform: 'uppercase' as const, letterSpacing: '0.06em', color: '#7c3aed', marginBottom: 6 }}>Loci Scholar</div>
+              <div style={{ fontFamily: 'var(--font-display)', fontSize: 30, fontWeight: 800, color: '#7c3aed', marginBottom: 2 }}>$13.99<span style={{ fontSize: 16, fontWeight: 500 }}>/mo</span></div>
+              <div style={{ fontFamily: 'var(--font-ui)', fontSize: 12, opacity: 0.6 }}>or $139/yr — Save 2 months</div>
+            </div>
+            <div style={{ padding: '16px 20px 24px' }}>
+              <ul style={{ margin: 0, padding: '0 0 0 16px', fontFamily: 'var(--font-ui)', fontSize: 13, lineHeight: 2, opacity: 0.8 }}>
+                <li>Everything in Reader</li>
+                <li>Narration Pro — audiobook-quality voices</li>
+                <li>Practice Quizzes</li>
+                <li>Chapter Briefs</li>
+                <li>Study Guide</li>
+                <li>Flashcards</li>
+              </ul>
+              <div style={{ fontFamily: 'var(--font-ui)', fontSize: 12, color: 'var(--text-tertiary)', marginTop: 8, opacity: 0.7 }}>
+                Students: $9.99/mo with code <strong>STUDENT</strong>
+              </div>
+              <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }} onClick={() => openSignUp()}
+                style={{ background: '#7c3aed', color: '#fff', fontFamily: 'var(--font-display)', fontStyle: 'italic' as const, fontSize: 15, padding: '13px 0', borderRadius: 10, border: 'none', cursor: 'pointer', width: '100%', marginTop: 16 }}>
+                Get started
+              </motion.button>
+              <p style={{ fontFamily: 'var(--font-ui)', fontSize: 12, color: 'var(--text-tertiary)', margin: '8px 0 0', textAlign: 'center' as const }}>No credit card required · cancel anytime</p>
+            </div>
           </motion.div>
         </div>
       </section>
+
+      <p style={{ textAlign: 'center', fontSize: 12, opacity: 0.45, fontFamily: 'var(--font-ui)', margin: '0 0 0', paddingBottom: 0, color: 'var(--text-tertiary)' }}>
+        Loci uses advanced language models to power Practice Quizzes, Chapter Briefs, and Study Guide.
+      </p>
 
       {/* ── 12. FAQ ─────────────────────────────────────────────────────────── */}
       <section id="faq" style={{ padding: isMobile ? '80px 24px' : '100px 24px', background: 'var(--bg-primary)' }}>
