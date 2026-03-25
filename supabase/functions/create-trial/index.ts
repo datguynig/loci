@@ -51,7 +51,7 @@ serve(async (req) => {
 
   const supabaseUrl     = Deno.env.get('SUPABASE_URL')!
   const supabaseService = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
-  const jwtSecret       = Deno.env.get('SUPABASE_JWT_SECRET')!
+  const jwtSecret       = Deno.env.get('JWT_SECRET')!
   const stripeKey       = Deno.env.get('STRIPE_SECRET_KEY')!
   const priceId         = Deno.env.get('STRIPE_SCHOLAR_MONTHLY_PRICE_ID')!
 

@@ -50,7 +50,7 @@ serve(async (req) => {
   const stripeKey   = Deno.env.get('STRIPE_SECRET_KEY')
   const supabaseUrl = Deno.env.get('SUPABASE_URL')!
   const serviceKey  = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
-  const jwtSecret   = Deno.env.get('SUPABASE_JWT_SECRET')!
+  const jwtSecret   = Deno.env.get('JWT_SECRET')!
   const appUrl      = Deno.env.get('APP_URL') ?? 'http://localhost:5173'
 
   if (!stripeKey || !serviceKey) {
