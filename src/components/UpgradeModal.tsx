@@ -10,9 +10,10 @@ interface UpgradeModalProps {
   onClose: () => void
   onCheckout: (tier: 'reader' | 'scholar', interval: BillingInterval) => void
   defaultTier?: 'reader' | 'scholar'
+  isTrialing?: boolean
 }
 
-export default function UpgradeModal({ isOpen, onClose, onCheckout, defaultTier = 'scholar' }: UpgradeModalProps) {
+export default function UpgradeModal({ isOpen, onClose, onCheckout, defaultTier = 'scholar', isTrialing = false }: UpgradeModalProps) {
   const [billingInterval, setBillingInterval] = useState<BillingInterval>('monthly')
   const [loading, setLoading] = useState<string | null>(null)
 
@@ -141,7 +142,14 @@ export default function UpgradeModal({ isOpen, onClose, onCheckout, defaultTier 
               </div>
             </div>
 
-            <p style={{ fontFamily: 'var(--font-ui)', fontSize: 12, color: 'var(--text-tertiary)', margin: '14px 0 0', textAlign: 'center' }}>No credit card required · cancel anytime</p>
+            {isTrialing && (
+              <p style={{ fontFamily: 'var(--font-ui)', fontSize: 12, color: 'var(--accent-warm)', margin: '14px 0 0', textAlign: 'center', fontWeight: 500 }}>
+                You're on a free trial — select a plan to add your payment details
+              </p>
+            )}
+            <p style={{ fontFamily: 'var(--font-ui)', fontSize: 12, color: 'var(--text-tertiary)', margin: isTrialing ? '4px 0 0' : '14px 0 0', textAlign: 'center' }}>
+              {isTrialing ? 'Your trial ends immediately when you subscribe · cancel anytime' : 'No credit card required · cancel anytime'}
+            </p>
           </motion.div>
         </motion.div>
       )}

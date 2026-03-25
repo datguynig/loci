@@ -209,12 +209,23 @@ function AppContent() {
       </AnimatePresence>
       <UpgradeModal
         isOpen={upgradeOpen}
+        isTrialing={subscription.isTrialing}
         onClose={() => setUpgradeOpen(false)}
         onCheckout={async (tier, interval) => {
-          const { createCheckoutSession } = await import('./services/subscriptionService')
-          await createCheckoutSession(tier, interval, () =>
-            getTokenRef.current({ template: 'supabase' }),
-          )
+          if (subscription.isTrialing) {
+            // User already has a trial subscription in Stripe — send them to the
+            // Customer Portal to add a payment method. Stripe will end the trial
+            // immediately and convert it to a paid subscription on the same plan,
+            // or the user can switch plans within the portal. This avoids creating
+            // a second orphaned subscription.
+            const { openCustomerPortal } = await import('./services/subscriptionService')
+            await openCustomerPortal(() => getTokenRef.current({ template: 'supabase' }))
+          } else {
+            const { createCheckoutSession } = await import('./services/subscriptionService')
+            await createCheckoutSession(tier, interval, () =>
+              getTokenRef.current({ template: 'supabase' }),
+            )
+          }
         }}
       />
     </>
