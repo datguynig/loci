@@ -13,6 +13,10 @@ async function verifyStripeSignature(payload: string, header: string, secret: st
   const signature = parts['v1']
   if (!timestamp || !signature) return false
 
+  // Reject signatures older than 5 minutes to prevent replay attacks
+  const timestampNum = parseInt(timestamp, 10)
+  if (isNaN(timestampNum) || Math.abs(Date.now() / 1000 - timestampNum) > 300) return false
+
   const signedPayload = `${timestamp}.${payload}`
   const key = await crypto.subtle.importKey(
     'raw',

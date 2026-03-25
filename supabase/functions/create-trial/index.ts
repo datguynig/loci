@@ -7,16 +7,6 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
-function decodeJwtPayload(token: string): Record<string, unknown> {
-  const parts = token.split('.')
-  if (parts.length < 2) return {}
-  try {
-    return JSON.parse(atob(parts[1].replace(/-/g, '+').replace(/_/g, '/')))
-  } catch {
-    return {}
-  }
-}
-
 serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
 
@@ -24,25 +14,22 @@ serve(async (req) => {
   const token = authHeader.replace('Bearer ', '')
   if (!token) return new Response('Unauthorized', { status: 401, headers: corsHeaders })
 
-  const payload = decodeJwtPayload(token)
-  const userId = payload.sub as string | undefined
-  const email = payload.email as string | undefined
-  if (!userId) return new Response('Unauthorized', { status: 401, headers: corsHeaders })
-
-  const stripeKey = Deno.env.get('STRIPE_SECRET_KEY')!
-  const priceId   = Deno.env.get('STRIPE_SCHOLAR_MONTHLY_PRICE_ID')!
   const supabaseUrl     = Deno.env.get('SUPABASE_URL')!
+  const anonKey         = Deno.env.get('SUPABASE_ANON_KEY')!
   const supabaseService = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+  const stripeKey       = Deno.env.get('STRIPE_SECRET_KEY')!
+  const priceId         = Deno.env.get('STRIPE_SCHOLAR_MONTHLY_PRICE_ID')!
+
+  // Cryptographically verify the JWT via Supabase auth
+  const userClient = createClient(supabaseUrl, anonKey, {
+    global: { headers: { Authorization: `Bearer ${token}` } },
+  })
+  const { data: { user }, error: authError } = await userClient.auth.getUser()
+  if (authError || !user) return new Response('Unauthorized', { status: 401, headers: corsHeaders })
+  const userId = user.id
+  const email = user.email
 
   const db = createClient(supabaseUrl, supabaseService)
-
-  // Idempotency: bail out if row already exists
-  const { data: existing } = await db
-    .from('subscriptions')
-    .select('user_id')
-    .eq('user_id', userId)
-    .maybeSingle()
-  if (existing) return new Response(JSON.stringify({ ok: true }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
 
   // Create Stripe customer
   const customerRes = await fetch('https://api.stripe.com/v1/customers', {
@@ -73,6 +60,7 @@ serve(async (req) => {
       'items[0][price]': priceId,
       trial_end: String(trialEnd),
       'payment_settings[save_default_payment_method]': 'on_subscription',
+      'subscription_data[metadata][user_id]': userId,
     }),
   })
   if (!subRes.ok) {
@@ -82,19 +70,22 @@ serve(async (req) => {
   }
   const sub = await subRes.json() as { id: string; status: string; trial_end: number | null; current_period_end: number }
 
-  // Insert subscription row
-  const { error: dbError } = await db.from('subscriptions').insert({
-    user_id:                userId,
-    tier:                   'scholar',
-    status:                 'trialing',
-    trial_ends_at:          sub.trial_end ? new Date(sub.trial_end * 1000).toISOString() : null,
-    current_period_end:     new Date(sub.current_period_end * 1000).toISOString(),
-    stripe_customer_id:     customer.id,
-    stripe_subscription_id: sub.id,
-    updated_at:             new Date().toISOString(),
-  })
+  // Atomic upsert — concurrent requests will not create duplicate DB rows
+  const { error: dbError } = await db.from('subscriptions').upsert(
+    {
+      user_id:                userId,
+      tier:                   'scholar',
+      status:                 'trialing',
+      trial_ends_at:          sub.trial_end ? new Date(sub.trial_end * 1000).toISOString() : null,
+      current_period_end:     new Date(sub.current_period_end * 1000).toISOString(),
+      stripe_customer_id:     customer.id,
+      stripe_subscription_id: sub.id,
+      updated_at:             new Date().toISOString(),
+    },
+    { onConflict: 'user_id', ignoreDuplicates: true }
+  )
   if (dbError) {
-    console.error('[create-trial] db insert error:', dbError)
+    console.error('[create-trial] db upsert error:', dbError)
     return new Response('DB error', { status: 500, headers: corsHeaders })
   }
 
