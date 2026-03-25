@@ -15,8 +15,6 @@ import type { FontSize, LayoutMode } from './hooks/useEpub'
 import { useSubscription } from './hooks/useSubscription'
 import UpgradeModal from './components/UpgradeModal'
 import TrialBanner from './components/TrialBanner'
-import type { SubscriptionState } from './hooks/useSubscription'
-
 type LegalPage = 'terms' | 'privacy'
 
 function parseLegalHash(): LegalPage | null {
@@ -114,6 +112,8 @@ function AppContent() {
   const subscription = useSubscription(supabase, user?.id)
   const [upgradeOpen, setUpgradeOpen] = useState(false)
 
+  const handleUpgrade = useCallback(() => setUpgradeOpen(true), [])
+
   // Raw Clerk JWT for the storage API (no Supabase template — the presign-api
   // verifies against Clerk JWKS directly).
   const getStorageToken = useCallback(() => getTokenRef.current(), [getToken]) // eslint-disable-line react-hooks/exhaustive-deps
@@ -165,12 +165,12 @@ function AppContent() {
       {subscription.isTrialing && (
         <TrialBanner
           trialEndsAt={subscription.trialEndsAt}
-          onUpgrade={() => setUpgradeOpen(true)}
+          onUpgrade={handleUpgrade}
         />
       )}
       <AnimatePresence mode="wait">
         {!openBook ? (
-          <Library key="library" supabase={supabase} getStorageToken={getStorageToken} onOpenBook={handleOpenBook} theme={prefs.theme} onThemeToggle={handleThemeToggle} colorScheme={prefs.colorScheme} onColorSchemeToggle={handleColorSchemeToggle} subscription={subscription} onUpgrade={() => setUpgradeOpen(true)} />
+          <Library key="library" supabase={supabase} getStorageToken={getStorageToken} onOpenBook={handleOpenBook} theme={prefs.theme} onThemeToggle={handleThemeToggle} colorScheme={prefs.colorScheme} onColorSchemeToggle={handleColorSchemeToggle} subscription={subscription} onUpgrade={handleUpgrade} />
         ) : (
           <Reader
             key="reader"
@@ -190,7 +190,7 @@ function AppContent() {
             onClose={() => setOpenBook(null)}
             studyOptions={openBook.studyOptions}
             subscription={subscription}
-            onUpgrade={() => setUpgradeOpen(true)}
+            onUpgrade={handleUpgrade}
           />
         )}
       </AnimatePresence>

@@ -170,6 +170,7 @@ export default function Reader({
     setNotesOpen(false)
   }
   const openScratchpad = () => {
+    // subscription is optional — absent means E2E/standalone mode, allow all features
     if (subscription && !subscription.canAccess('scratchpad')) {
       onUpgrade?.()
       return
@@ -184,6 +185,7 @@ export default function Reader({
     if (studyOptions?.chapterHref) {
       setStudyPanelOpen(true)
     } else if (studyOptions?.panel === 'scratchpad') {
+      // absent subscription = E2E/standalone mode, allow auto-open
       if (!subscription || subscription.canAccess('scratchpad')) {
         setScratchpadOpen(true)
       }

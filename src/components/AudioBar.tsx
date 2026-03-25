@@ -176,6 +176,7 @@ export default function AudioBar({
   const isMobile = useWindowWidth() < 600
   const [ttsSheetOpen, setTtsSheetOpen] = useState(false)
   const currentSentence = sentences[currentSentenceIndex] ?? ''
+  // When subscription is not provided (E2E / standalone mode), default to allowing narration
   const canNarrate = subscription?.canAccess('loci-narration') ?? true
 
   const handlePlayPause = () => {
