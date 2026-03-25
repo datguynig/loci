@@ -12,11 +12,37 @@ serve(async (req) => {
   }
 
   try {
-    // Parse request
-    const { action, messages, context } = await req.json()
+    // Parse request — tolerate missing fields (some clients / proxies send partial bodies)
+    let raw: unknown
+    try {
+      raw = await req.json()
+    } catch {
+      return new Response(JSON.stringify({ error: 'Invalid or empty JSON body' }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
+    }
 
-    const quizLength: number = context.quizLength ?? 5
-    const retryQuestions: string[] | undefined = context.retryQuestions?.length ? context.retryQuestions : undefined
+    if (!raw || typeof raw !== 'object') {
+      return new Response(JSON.stringify({ error: 'Request body must be a JSON object' }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
+    }
+
+    const body = raw as Record<string, unknown>
+    const action = typeof body.action === 'string' ? body.action : 'chat'
+    const messages = Array.isArray(body.messages) ? body.messages : []
+    const context =
+      body.context !== null && body.context !== undefined && typeof body.context === 'object'
+        ? (body.context as Record<string, unknown>)
+        : {}
+
+    const quizLength: number = typeof context.quizLength === 'number' ? context.quizLength : 5
+    const retryQuestions: string[] | undefined =
+      Array.isArray(context.retryQuestions) && context.retryQuestions.length > 0
+        ? (context.retryQuestions as string[])
+        : undefined
 
     // Build system prompt — tailored to the provider's strengths
     const baseInstructions = `You are an expert study assistant helping a student deeply understand their reading material.
@@ -94,35 +120,62 @@ Begin immediately with Question 1/${quizLength}:]`
 
     // Build context string to append to first user message (or as a separate system context)
     const contextParts: string[] = []
-    if (context.chapterText) {
-      contextParts.push(`CHAPTER TEXT:\n${context.chapterText.slice(0, 40000)}`)
+    const chapterText = typeof context.chapterText === 'string' ? context.chapterText : ''
+    if (chapterText) {
+      contextParts.push(`CHAPTER TEXT:\n${chapterText.slice(0, 40000)}`)
     }
-    if (context.chapterNotes?.length) {
-      contextParts.push(`CHAPTER NOTES:\n${context.chapterNotes.join('\n')}`)
+    const chapterNotes = Array.isArray(context.chapterNotes) ? context.chapterNotes.filter((x): x is string => typeof x === 'string') : []
+    if (chapterNotes.length) {
+      contextParts.push(`CHAPTER NOTES:\n${chapterNotes.join('\n')}`)
     }
-    if (context.scratchpad) {
-      contextParts.push(`SCRATCHPAD:\n${context.scratchpad}`)
+    const scratchpad = typeof context.scratchpad === 'string' ? context.scratchpad : ''
+    if (scratchpad) {
+      contextParts.push(`SCRATCHPAD:\n${scratchpad}`)
     }
-    if (context.annotations?.length) {
-      contextParts.push(`HIGHLIGHTS & NOTES:\n${context.annotations.map((a: any) => `"${a.quote}" — ${a.note}`).join('\n')}`)
+    const annotations = Array.isArray(context.annotations) ? context.annotations : []
+    if (annotations.length) {
+      contextParts.push(
+        `HIGHLIGHTS & NOTES:\n${
+          annotations
+            .map((a: { quote?: string; note?: string }) => `"${a.quote ?? ''}" — ${a.note ?? ''}`)
+            .join('\n')
+        }`,
+      )
     }
-    if (context.flashcards?.length) {
-      contextParts.push(`SAVED FLASHCARDS:\n${context.flashcards.map((f: any) => `Q: ${f.front} / A: ${f.back}`).join('\n')}`)
+    const flashcards = Array.isArray(context.flashcards) ? context.flashcards : []
+    if (flashcards.length) {
+      contextParts.push(
+        `SAVED FLASHCARDS:\n${
+          flashcards
+            .map((f: { front?: string; back?: string }) => `Q: ${f.front ?? ''} / A: ${f.back ?? ''}`)
+            .join('\n')
+        }`,
+      )
     }
-    if (context.selectedText) {
-      contextParts.push(`SELECTED TEXT:\n${context.selectedText}`)
+    const selectedText = typeof context.selectedText === 'string' ? context.selectedText : ''
+    if (selectedText) {
+      contextParts.push(`SELECTED TEXT:\n${selectedText}`)
     }
     const contextBlock = contextParts.join('\n\n')
 
     const provider = Deno.env.get('AI_PROVIDER') ?? 'anthropic'
     console.log(`[ai-study] provider=${provider}`)
 
-    // Build the augmented messages — prepend context to the first user message
-    const augmentedMessages = messages.map((m: any, i: number) => {
-      if (i === 0 && m.role === 'user' && contextBlock) {
-        return { ...m, content: `${contextBlock}\n\n---\n\n${m.content}${actionInstruction}` }
+    if (!messages.length) {
+      return new Response(JSON.stringify({ error: 'messages must be a non-empty array' }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
+    }
+
+    // Normalize message shape for Anthropic / Gemini (avoid undefined content)
+    const augmentedMessages = messages.map((m: { role?: string; content?: unknown }, i: number) => {
+      const role = m?.role === 'assistant' ? 'assistant' : 'user'
+      const base = typeof m?.content === 'string' ? m.content : String(m?.content ?? '')
+      if (i === 0 && role === 'user' && contextBlock) {
+        return { role: 'user', content: `${contextBlock}\n\n---\n\n${base}${actionInstruction}` }
       }
-      return m
+      return { role, content: base }
     })
 
     if (provider === 'google') {
