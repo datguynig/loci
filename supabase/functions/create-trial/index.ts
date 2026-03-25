@@ -172,7 +172,7 @@ serve(async (req) => {
       'items[0][price]': priceId,
       trial_end: String(trialEnd),
       'payment_settings[save_default_payment_method]': 'on_subscription',
-      'subscription_data[metadata][user_id]': userId,
+      'metadata[user_id]': userId,
     }),
   })
   if (!subRes.ok) {

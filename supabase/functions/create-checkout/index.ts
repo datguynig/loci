@@ -104,12 +104,13 @@ serve(async (req) => {
   const token = authHeader.replace(/^Bearer\s+/i, '').trim()
   if (!token) return new Response('Unauthorized', { status: 401, headers: corsHeaders })
 
-  const stripeKey   = Deno.env.get('STRIPE_SECRET_KEY')
-  const supabaseUrl = Deno.env.get('SUPABASE_URL')!
-  const serviceKey  = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
-  const jwksUrl     = Deno.env.get('CLERK_JWKS_URL')!
-  const jwtSecret   = Deno.env.get('JWT_SECRET')!
-  const appUrl      = Deno.env.get('APP_URL') ?? 'http://localhost:5173'
+  const stripeKey        = Deno.env.get('STRIPE_SECRET_KEY')
+  const supabaseUrl      = Deno.env.get('SUPABASE_URL')!
+  const serviceKey       = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
+  const jwksUrl          = Deno.env.get('CLERK_JWKS_URL')!
+  const jwtSecret        = Deno.env.get('JWT_SECRET')!
+  const appUrl           = Deno.env.get('APP_URL') ?? 'http://localhost:5173'
+  const masterCouponCode = Deno.env.get('STRIPE_MASTER_COUPON_CODE')
 
   if (!stripeKey || !serviceKey) {
     return new Response('Server misconfiguration', { status: 500, headers: corsHeaders })
@@ -138,6 +139,8 @@ serve(async (req) => {
     .eq('user_id', userId)
     .maybeSingle()
 
+  // If a master coupon code is configured (for testing), pre-apply it.
+  // 'allow_promotion_codes' and 'discounts' are mutually exclusive in Stripe.
   const checkoutBody: Record<string, string> = {
     mode: 'subscription',
     'line_items[0][price]': priceId,
@@ -145,7 +148,10 @@ serve(async (req) => {
     'subscription_data[metadata][user_id]': userId,
     success_url: `${appUrl}?checkout=success`,
     cancel_url:  `${appUrl}?checkout=cancel`,
-    'allow_promotion_codes': 'true',
+    ...(masterCouponCode
+      ? { 'discounts[0][coupon]': masterCouponCode }
+      : { 'allow_promotion_codes': 'true' }
+    ),
   }
 
   if (sub?.stripe_customer_id) {
