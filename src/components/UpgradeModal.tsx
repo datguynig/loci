@@ -146,9 +146,6 @@ export default function UpgradeModal({ isOpen, onClose, onCheckout, defaultTier 
                 <div style={{ fontFamily: '"DM Sans", system-ui, sans-serif', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: '#7c3aed' }}>Loci Scholar</div>
                 <div style={{ fontFamily: '"Playfair Display", Georgia, serif', fontSize: 26, fontWeight: 800, color: '#7c3aed' }}>{scholarPrice}</div>
                 {featureList(['Everything in Reader', 'Narration Pro — audiobook-quality voices', 'Practice Quizzes', 'Chapter Briefs', 'Study Guide', 'Flashcards'])}
-                <div style={{ fontSize: 12, color: 'var(--text-tertiary)', fontFamily: '"DM Sans", system-ui, sans-serif', opacity: 0.7 }}>
-                  Students: use code <strong>STUDENT</strong> at checkout for $9.99/mo
-                </div>
                 <button
                   style={{ ...btn, background: '#7c3aed', color: '#fff', opacity: loading ? 0.7 : 1 }}
                   disabled={loading !== null}

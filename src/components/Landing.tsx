@@ -1162,9 +1162,6 @@ export default function Landing() {
                 <li>Study Guide</li>
                 <li>Flashcards</li>
               </ul>
-              <div style={{ fontFamily: 'var(--font-ui)', fontSize: 12, color: 'var(--text-tertiary)', marginTop: 8, opacity: 0.7 }}>
-                Students: $9.99/mo with code <strong>STUDENT</strong>
-              </div>
               <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }} onClick={() => openSignUp()}
                 style={{ background: '#7c3aed', color: '#fff', fontFamily: 'var(--font-display)', fontStyle: 'italic' as const, fontSize: 15, padding: '13px 0', borderRadius: 10, border: 'none', cursor: 'pointer', width: '100%', marginTop: 16 }}>
                 Get started
