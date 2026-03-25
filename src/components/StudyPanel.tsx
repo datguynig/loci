@@ -7,6 +7,7 @@ import { sendStudyMessage } from '../services/aiStudyService'
 import type { StudyContext, Message } from '../services/aiStudyService'
 import { saveQuizSession } from '../services/quizService'
 import type { QuizQuestion } from '../services/quizService'
+import type { SubscriptionState } from '../hooks/useSubscription'
 
 interface StudyPanelProps {
   isOpen: boolean
@@ -21,6 +22,8 @@ interface StudyPanelProps {
   reviewMode?: { chapterHref: string }
   reviewFlashcards?: import('../services/flashcardService').Flashcard[]
   onMarkReviewed?: (id: string) => void
+  subscription?: SubscriptionState
+  onUpgrade?: () => void
 }
 
 // ─── Quiz state ────────────────────────────────────────────────────────────
@@ -365,6 +368,8 @@ export default function StudyPanel({
   reviewMode,
   reviewFlashcards,
   onMarkReviewed,
+  subscription,
+  onUpgrade,
 }: StudyPanelProps) {
   const { getToken } = useAuth()
   const [messages, setMessages] = useState<Message[]>([])
@@ -494,6 +499,10 @@ export default function StudyPanel({
 
   // ── Send handler ─────────────────────────────────────────────────────────
   async function handleSend(text: string, config?: { retryQuestions?: string[]; forceQuizStart?: number }) {
+    if (subscription && !subscription.canAccess('practice-quizzes')) {
+      onUpgrade?.()
+      return
+    }
     if (!text.trim() || streaming) return
 
     const lowerText = text.toLowerCase()

@@ -27,6 +27,7 @@ import Scratchpad from './Scratchpad'
 import ReaderTour from './ReaderTour'
 import { useWindowWidth } from '../hooks/useWindowWidth'
 import type { StudyContext } from '../services/aiStudyService'
+import type { SubscriptionState } from '../hooks/useSubscription'
 
 
 interface ReaderProps {
@@ -45,6 +46,8 @@ interface ReaderProps {
   onAutoscrollChange: (v: boolean) => void
   onClose?: () => void
   studyOptions?: { panel?: 'scratchpad'; chapterHref?: string }
+  subscription?: SubscriptionState
+  onUpgrade?: () => void
 }
 
 const FONT_SIZE_ORDER: FontSize[] = ['sm', 'md', 'lg', 'xl']
@@ -66,6 +69,8 @@ export default function Reader({
   onAutoscrollChange,
   onClose,
   studyOptions,
+  subscription,
+  onUpgrade,
 }: ReaderProps) {
   const { user } = useUser()
   const userId = user?.id ?? ''
@@ -165,6 +170,10 @@ export default function Reader({
     setNotesOpen(false)
   }
   const openScratchpad = () => {
+    if (subscription && !subscription.canAccess('scratchpad')) {
+      onUpgrade?.()
+      return
+    }
     setScratchpadOpen(true)
     setStudyPanelOpen(false)
     setNotesOpen(false)
@@ -175,7 +184,9 @@ export default function Reader({
     if (studyOptions?.chapterHref) {
       setStudyPanelOpen(true)
     } else if (studyOptions?.panel === 'scratchpad') {
-      setScratchpadOpen(true)
+      if (!subscription || subscription.canAccess('scratchpad')) {
+        setScratchpadOpen(true)
+      }
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
@@ -1107,6 +1118,8 @@ export default function Reader({
                   : undefined
               }
               onMarkReviewed={flashcards.markReviewed}
+              subscription={subscription}
+              onUpgrade={onUpgrade}
             />
           )}
         </AnimatePresence>
@@ -1362,6 +1375,8 @@ export default function Reader({
         onAutoscrollChange={onAutoscrollChange}
         settingsOpen={settingsOpen}
         onSettingsToggle={toggleSettings}
+        subscription={subscription}
+        onUpgrade={onUpgrade}
       />
       </div>
 

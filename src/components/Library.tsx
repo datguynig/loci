@@ -12,6 +12,7 @@ import BookDetailModal from './BookDetailModal'
 import ThemeToggle from './ThemeToggle'
 import type { ColorScheme } from '../hooks/usePreferences'
 import { useWindowWidth } from '../hooks/useWindowWidth'
+import type { SubscriptionState } from '../hooks/useSubscription'
 
 // ─── Appearance settings page (rendered inside Clerk UserButton profile modal) ─
 
@@ -131,9 +132,11 @@ interface LibraryProps {
   onThemeToggle: () => void
   colorScheme: ColorScheme
   onColorSchemeToggle: () => void
+  subscription: SubscriptionState
+  onUpgrade: () => void
 }
 
-export default function Library({ supabase, getStorageToken, onOpenBook, theme, onThemeToggle, colorScheme, onColorSchemeToggle }: LibraryProps) {
+export default function Library({ supabase, getStorageToken, onOpenBook, theme, onThemeToggle, colorScheme, onColorSchemeToggle, subscription, onUpgrade }: LibraryProps) {
   const width = useWindowWidth()
   const isMobile = width < 600
   const { books, loading, uploadState, uploadError, upload, refresh } = useLibrary(supabase, getStorageToken)
@@ -152,10 +155,15 @@ export default function Library({ supabase, getStorageToken, onOpenBook, theme, 
       if (!files?.length) return
       const file = files[0]
       if (!file.name.toLowerCase().endsWith('.epub')) return
+      // Free tier: cap at 5 books
+      if (!subscription.canAccess('unlimited-books') && books.length >= 5) {
+        onUpgrade()
+        return
+      }
       const book = await upload(file)
       if (book) onOpenBook(file, book.id)
     },
-    [upload, onOpenBook],
+    [upload, onOpenBook, subscription, books.length, onUpgrade],
   )
 
   const handleOpenBook = useCallback(
@@ -308,6 +316,17 @@ export default function Library({ supabase, getStorageToken, onOpenBook, theme, 
               </>
             )}
           </button>
+          {!subscription.canAccess('unlimited-books') && books.length >= 5 && (
+            <div style={{ fontFamily: '"DM Sans", system-ui, sans-serif', fontSize: 12, color: 'var(--text-tertiary)', marginTop: 6, textAlign: 'center' }}>
+              Free plan: 5 books maximum.{' '}
+              <button
+                onClick={onUpgrade}
+                style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#7c3aed', fontSize: 12, padding: 0, fontFamily: 'inherit', textDecoration: 'underline' }}
+              >
+                Upgrade to add more
+              </button>
+            </div>
+          )}
           <UserButton>
             <UserButton.UserProfilePage label="Appearance" url="appearance" labelIcon={<PaletteIcon />}>
               <AppearanceSettingsPage

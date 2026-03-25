@@ -12,6 +12,10 @@ import { usePreferences } from './hooks/usePreferences'
 import { createSupabaseClient } from './services/supabaseClient'
 import { syncPreferencesFromSupabase, pushPreferencesToSupabase } from './services/preferencesService'
 import type { FontSize, LayoutMode } from './hooks/useEpub'
+import { useSubscription } from './hooks/useSubscription'
+import UpgradeModal from './components/UpgradeModal'
+import TrialBanner from './components/TrialBanner'
+import type { SubscriptionState } from './hooks/useSubscription'
 
 type LegalPage = 'terms' | 'privacy'
 
@@ -107,6 +111,9 @@ function AppContent() {
     [], // eslint-disable-line react-hooks/exhaustive-deps
   )
 
+  const subscription = useSubscription(supabase, user?.id)
+  const [upgradeOpen, setUpgradeOpen] = useState(false)
+
   // Raw Clerk JWT for the storage API (no Supabase template — the presign-api
   // verifies against Clerk JWKS directly).
   const getStorageToken = useCallback(() => getTokenRef.current(), [getToken]) // eslint-disable-line react-hooks/exhaustive-deps
@@ -154,30 +161,48 @@ function AppContent() {
   }, [prefs.colorScheme, set])
 
   return (
-    <AnimatePresence mode="wait">
-      {!openBook ? (
-        <Library key="library" supabase={supabase} getStorageToken={getStorageToken} onOpenBook={handleOpenBook} theme={prefs.theme} onThemeToggle={handleThemeToggle} colorScheme={prefs.colorScheme} onColorSchemeToggle={handleColorSchemeToggle} />
-      ) : (
-        <Reader
-          key="reader"
-          file={openBook.file}
-          bookId={openBook.bookId}
-          supabase={supabase}
-          theme={prefs.theme}
-          fontSize={prefs.fontSize}
-          layoutMode={prefs.layoutMode}
-          highlightEnabled={prefs.highlightEnabled}
-          autoscrollEnabled={prefs.autoscrollEnabled}
-          onThemeToggle={handleThemeToggle}
-          onFontSizeChange={(s: FontSize) => set('fontSize', s)}
-          onLayoutModeChange={(m: LayoutMode) => set('layoutMode', m)}
-          onHighlightChange={(v: boolean) => set('highlightEnabled', v)}
-          onAutoscrollChange={(v: boolean) => set('autoscrollEnabled', v)}
-          onClose={() => setOpenBook(null)}
-          studyOptions={openBook.studyOptions}
+    <>
+      {subscription.isTrialing && (
+        <TrialBanner
+          trialEndsAt={subscription.trialEndsAt}
+          onUpgrade={() => setUpgradeOpen(true)}
         />
       )}
-    </AnimatePresence>
+      <AnimatePresence mode="wait">
+        {!openBook ? (
+          <Library key="library" supabase={supabase} getStorageToken={getStorageToken} onOpenBook={handleOpenBook} theme={prefs.theme} onThemeToggle={handleThemeToggle} colorScheme={prefs.colorScheme} onColorSchemeToggle={handleColorSchemeToggle} subscription={subscription} onUpgrade={() => setUpgradeOpen(true)} />
+        ) : (
+          <Reader
+            key="reader"
+            file={openBook.file}
+            bookId={openBook.bookId}
+            supabase={supabase}
+            theme={prefs.theme}
+            fontSize={prefs.fontSize}
+            layoutMode={prefs.layoutMode}
+            highlightEnabled={prefs.highlightEnabled}
+            autoscrollEnabled={prefs.autoscrollEnabled}
+            onThemeToggle={handleThemeToggle}
+            onFontSizeChange={(s: FontSize) => set('fontSize', s)}
+            onLayoutModeChange={(m: LayoutMode) => set('layoutMode', m)}
+            onHighlightChange={(v: boolean) => set('highlightEnabled', v)}
+            onAutoscrollChange={(v: boolean) => set('autoscrollEnabled', v)}
+            onClose={() => setOpenBook(null)}
+            studyOptions={openBook.studyOptions}
+            subscription={subscription}
+            onUpgrade={() => setUpgradeOpen(true)}
+          />
+        )}
+      </AnimatePresence>
+      <UpgradeModal
+        isOpen={upgradeOpen}
+        onClose={() => setUpgradeOpen(false)}
+        onCheckout={async (tier, interval) => {
+          const { createCheckoutSession } = await import('./services/subscriptionService')
+          await createCheckoutSession(tier, interval)
+        }}
+      />
+    </>
   )
 }
 

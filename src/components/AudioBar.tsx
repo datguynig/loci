@@ -3,13 +3,11 @@ import { motion } from 'framer-motion'
 import BottomSheet from './BottomSheet'
 import type { TTSProvider, ElevenLabsModel } from '../services/ttsService'
 import type { ElevenLabsVoice } from '../services/ttsService'
-import { hasElevenLabs } from '../utils/tts'
 import type { FontSize, LayoutMode } from '../hooks/useEpub'
+import type { SubscriptionState } from '../hooks/useSubscription'
 import VoicePicker from './VoicePicker'
 import ReaderSettings from './ReaderSettings'
 import { useWindowWidth } from '../hooks/useWindowWidth'
-
-const HAS_ELEVENLABS = hasElevenLabs()
 
 interface AudioBarProps {
   isPlaying: boolean
@@ -47,6 +45,8 @@ interface AudioBarProps {
   onAutoscrollChange: (v: boolean) => void
   settingsOpen: boolean
   onSettingsToggle: () => void
+  subscription?: SubscriptionState
+  onUpgrade?: () => void
 }
 
 const SPEED_OPTIONS = [0.5, 0.75, 1, 1.25, 1.5, 1.75, 2]
@@ -169,13 +169,20 @@ export default function AudioBar({
   onAutoscrollChange,
   settingsOpen,
   onSettingsToggle,
+  subscription,
+  onUpgrade,
 }: AudioBarProps) {
   const gearRef = useRef<HTMLButtonElement>(null)
   const isMobile = useWindowWidth() < 600
   const [ttsSheetOpen, setTtsSheetOpen] = useState(false)
   const currentSentence = sentences[currentSentenceIndex] ?? ''
+  const canNarrate = subscription?.canAccess('loci-narration') ?? true
 
   const handlePlayPause = () => {
+    if (!canNarrate) {
+      onUpgrade?.()
+      return
+    }
     if (isPlaying && !isPaused) onPause()
     else if (isPaused) onResume()
     else onPlay()
@@ -293,7 +300,7 @@ export default function AudioBar({
             />
             {provider === 'elevenlabs' && isPlaying && !isPaused && <Waveform />}
 
-            {HAS_ELEVENLABS && provider === 'elevenlabs' && (
+            {canNarrate && provider === 'elevenlabs' && (
               <div style={{ display: 'flex', background: 'var(--bg-secondary)', borderRadius: 20, padding: 2, border: '1px solid var(--border)' }}>
                 {(['eleven_turbo_v2_5', 'eleven_multilingual_v2'] as ElevenLabsModel[]).map((m) => (
                   <button key={m} onClick={() => setModel(m)} style={{ padding: '2px 8px', borderRadius: 16, border: 'none', background: selectedModel === m ? 'var(--accent-warm)' : 'transparent', color: selectedModel === m ? '#fff' : 'var(--text-tertiary)', fontFamily: 'var(--font-ui)', fontSize: 10, fontWeight: 500, cursor: 'pointer', transition: 'all 120ms ease', whiteSpace: 'nowrap' }}>
@@ -307,13 +314,13 @@ export default function AudioBar({
               {SPEED_OPTIONS.map((s) => <option key={s} value={s}>{s}×</option>)}
             </select>
 
-            {HAS_ELEVENLABS && provider === 'elevenlabs' && elevenLabsVoices.length > 0 ? (
+            {canNarrate && provider === 'elevenlabs' && elevenLabsVoices.length > 0 ? (
               <VoicePicker voices={elevenLabsVoices} selectedVoiceId={selectedVoiceId} onSelect={setVoiceId} />
             ) : provider === 'browser' && browserVoices.length > 0 ? (
               <select value={selectedBrowserVoice?.name ?? ''} onChange={(e) => { const v = browserVoices.find((bv) => bv.name === e.target.value); if (v) setBrowserVoice(v) }} aria-label="Select voice" style={{ ...selectStyle, maxWidth: 120 }}>
                 {browserVoices.map((v) => <option key={v.name} value={v.name}>{v.name}</option>)}
               </select>
-            ) : !HAS_ELEVENLABS && (
+            ) : !canNarrate && (
               <span style={{ fontFamily: 'var(--font-ui)', fontSize: 11, color: 'var(--text-tertiary)' }}>Browser voice</span>
             )}
 
@@ -367,7 +374,7 @@ export default function AudioBar({
           </div>
 
           {/* Voice — ElevenLabs: compact 2-column grid */}
-          {HAS_ELEVENLABS && provider === 'elevenlabs' && elevenLabsVoices.length > 0 && (
+          {canNarrate && provider === 'elevenlabs' && elevenLabsVoices.length > 0 && (
             <div style={{ padding: '16px 20px 4px' }}>
               <div style={{ fontFamily: 'var(--font-ui)', fontSize: 12, color: 'var(--text-tertiary)', marginBottom: 10 }}>Voice</div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
@@ -414,7 +421,7 @@ export default function AudioBar({
           )}
 
           {/* ElevenLabs model */}
-          {HAS_ELEVENLABS && provider === 'elevenlabs' && (
+          {canNarrate && provider === 'elevenlabs' && (
             <div style={{ padding: '16px 20px 4px' }}>
               <div style={{ fontFamily: 'var(--font-ui)', fontSize: 12, color: 'var(--text-tertiary)', marginBottom: 10 }}>Quality</div>
               <div style={{ display: 'flex', gap: 8 }}>
