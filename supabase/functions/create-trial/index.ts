@@ -85,7 +85,7 @@ serve(async (req) => {
     console.error('[create-trial] subscription error:', err)
     return new Response('Stripe subscription error', { status: 500, headers: corsHeaders })
   }
-  const sub = await subRes.json() as { id: string; status: string; trial_end: number | null; current_period_end: number }
+  const sub = await subRes.json() as { id: string; status: string; trial_end: number | null; current_period_end: number | null }
 
   // Upsert — last-write-wins on user_id. The idempotency check above means
   // we should never reach here twice for the same user, but the upsert keeps
@@ -96,7 +96,7 @@ serve(async (req) => {
       tier:                   'scholar',
       status:                 'trialing',
       trial_ends_at:          sub.trial_end ? new Date(sub.trial_end * 1000).toISOString() : null,
-      current_period_end:     new Date(sub.current_period_end * 1000).toISOString(),
+      current_period_end:     sub.current_period_end ? new Date(sub.current_period_end * 1000).toISOString() : null,
       stripe_customer_id:     customer.id,
       stripe_subscription_id: sub.id,
       updated_at:             new Date().toISOString(),
