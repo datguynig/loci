@@ -178,6 +178,7 @@ export default function AudioBar({
   const currentSentence = sentences[currentSentenceIndex] ?? ''
   // When subscription is not provided (E2E / standalone mode), default to allowing narration
   const canNarrate = subscription?.canAccess('loci-narration') ?? true
+  const canNarrateP = subscription?.canAccess('loci-narration-pro') ?? true
 
   const handlePlayPause = () => {
     if (!canNarrate) {
@@ -301,7 +302,7 @@ export default function AudioBar({
             />
             {provider === 'elevenlabs' && isPlaying && !isPaused && <Waveform />}
 
-            {canNarrate && provider === 'elevenlabs' && (
+            {canNarrate && canNarrateP && provider === 'elevenlabs' && (
               <div style={{ display: 'flex', background: 'var(--bg-secondary)', borderRadius: 20, padding: 2, border: '1px solid var(--border)' }}>
                 {(['eleven_turbo_v2_5', 'eleven_multilingual_v2'] as ElevenLabsModel[]).map((m) => (
                   <button key={m} onClick={() => setModel(m)} style={{ padding: '2px 8px', borderRadius: 16, border: 'none', background: selectedModel === m ? 'var(--accent-warm)' : 'transparent', color: selectedModel === m ? '#fff' : 'var(--text-tertiary)', fontFamily: 'var(--font-ui)', fontSize: 10, fontWeight: 500, cursor: 'pointer', transition: 'all 120ms ease', whiteSpace: 'nowrap' }}>
@@ -422,7 +423,7 @@ export default function AudioBar({
           )}
 
           {/* ElevenLabs model */}
-          {canNarrate && provider === 'elevenlabs' && (
+          {canNarrate && canNarrateP && provider === 'elevenlabs' && (
             <div style={{ padding: '16px 20px 4px' }}>
               <div style={{ fontFamily: 'var(--font-ui)', fontSize: 12, color: 'var(--text-tertiary)', marginBottom: 10 }}>Quality</div>
               <div style={{ display: 'flex', gap: 8 }}>

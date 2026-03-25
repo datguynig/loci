@@ -373,6 +373,7 @@ export default function Reader({
   }, [bookmarks, epub.currentHref, epub.toc, epub.currentChapter])
 
   const { toc, currentChapterIndex, getCurrentText } = epub
+  const canNarrate = subscription?.canAccess('loci-narration') ?? true
 
   const handleNextReadingStep = useCallback(() => {
     if (navigationScope === 'chapter') {
@@ -431,7 +432,8 @@ export default function Reader({
         case 'P':
           if (speechIsPlaying && !speechIsPaused) pauseSpeech()
           else if (speechIsPaused) resumeSpeech()
-          else speakSpeech(getCurrentText())
+          else if (canNarrate) speakSpeech(getCurrentText())
+          else onUpgrade?.()
           break
         case 's':
         case 'S':
