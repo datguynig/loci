@@ -103,6 +103,20 @@ serve(async (req) => {
     const userId = sub.metadata?.user_id
     if (!userId) return new Response('ok')
 
+    // Only downgrade if this deleted subscription is the one we track. Otherwise
+    // canceling an older / duplicate sub (e.g. orphan trial) would wipe the row
+    // while the customer's active Stripe subscription is still live.
+    const { data: row } = await db
+      .from('subscriptions')
+      .select('stripe_subscription_id')
+      .eq('user_id', userId)
+      .maybeSingle()
+
+    if (row?.stripe_subscription_id && row.stripe_subscription_id !== sub.id) {
+      console.log('[stripe-webhook] ignoring delete for non-current subscription', sub.id, 'tracked:', row.stripe_subscription_id)
+      return new Response('ok')
+    }
+
     const { error: updateError } = await db.from('subscriptions')
       .update({ tier: 'free', status: 'canceled', updated_at: new Date().toISOString() })
       .eq('user_id', userId)
