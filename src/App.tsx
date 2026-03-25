@@ -97,10 +97,15 @@ interface OpenBook {
 function AppContent() {
   const [openBook, setOpenBook] = useState<OpenBook | null>(null)
   const { prefs, set } = usePreferences()
-  const { getToken } = useAuth()
+  const { getToken, isLoaded: authLoaded } = useAuth()
   const { user } = useUser()
   const getTokenRef = useRef(getToken)
   getTokenRef.current = getToken
+
+  const getSupabaseAccessToken = useCallback(
+    () => getTokenRef.current({ template: 'supabase' }),
+    [],
+  )
 
   // Create the Supabase client once — use a ref for getToken so the client
   // is never recreated (prevents multiple GoTrueClient instances).
@@ -109,18 +114,16 @@ function AppContent() {
     [], // eslint-disable-line react-hooks/exhaustive-deps
   )
 
-  const subscription = useSubscription(supabase, user?.id)
+  const subscriptionUserId = authLoaded ? user?.id ?? null : null
+  const subscription = useSubscription(supabase, subscriptionUserId, getSupabaseAccessToken)
   const [upgradeOpen, setUpgradeOpen] = useState(false)
 
   const handleUpgrade = useCallback(() => setUpgradeOpen(true), [])
 
   const handleManageBilling = useCallback(async () => {
     const { openCustomerPortal } = await import('./services/subscriptionService')
-    await openCustomerPortal(async () => {
-      const { data } = await supabase.auth.getSession()
-      return data.session?.access_token ?? null
-    })
-  }, [supabase])
+    await openCustomerPortal(() => getTokenRef.current({ template: 'supabase' }))
+  }, [])
 
   // Raw Clerk JWT for the storage API (no Supabase template — the presign-api
   // verifies against Clerk JWKS directly).
@@ -209,10 +212,9 @@ function AppContent() {
         onClose={() => setUpgradeOpen(false)}
         onCheckout={async (tier, interval) => {
           const { createCheckoutSession } = await import('./services/subscriptionService')
-          await createCheckoutSession(tier, interval, async () => {
-            const { data } = await supabase.auth.getSession()
-            return data.session?.access_token ?? null
-          })
+          await createCheckoutSession(tier, interval, () =>
+            getTokenRef.current({ template: 'supabase' }),
+          )
         }}
       />
     </>

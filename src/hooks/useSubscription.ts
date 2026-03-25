@@ -73,6 +73,8 @@ async function fetchRow(supabase: SupabaseClient, userId: string) {
 export function useSubscription(
   supabase: SupabaseClient | null,
   userId: string | null | undefined,
+  /** Clerk JWT for Supabase (same as `createSupabaseClient` — template `supabase`). Required here because `persistSession: false` means `supabase.auth.getSession()` is always empty. */
+  getSupabaseAccessToken?: () => Promise<string | null>,
 ): SubscriptionState {
   const [state, setState] = useState<SubscriptionState>(LOADING_STATE)
 
@@ -106,10 +108,11 @@ export function useSubscription(
     }
 
     if (!data) {
-      // First sign-in — create the Scholar trial
+      // First sign-in — create the Scholar trial (Edge Function validates JWT via Supabase auth.getUser)
       try {
-        const { data: sessionData } = await supabase.auth.getSession()
-        const token = sessionData?.session?.access_token
+        const token = getSupabaseAccessToken
+          ? await getSupabaseAccessToken()
+          : (await supabase.auth.getSession()).data.session?.access_token ?? null
         if (!token) throw new Error('No access token available')
         const trialRes = await fetch(
           `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/create-trial`,
@@ -134,7 +137,7 @@ export function useSubscription(
     }
 
     applyRow(data)
-  }, [supabase, userId])
+  }, [supabase, userId, getSupabaseAccessToken])
 
   useEffect(() => {
     load()
