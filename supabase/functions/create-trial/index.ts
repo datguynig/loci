@@ -7,6 +7,41 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
+// Verify a Clerk HS256 JWT signed with the Supabase JWT secret.
+// We do this instead of auth.getUser() because users are in Clerk, not Supabase Auth,
+// so auth.getUser() always returns null for Clerk-issued tokens.
+async function verifyJWT(token: string, secret: string): Promise<{ sub: string; email?: string } | null> {
+  try {
+    const parts = token.split('.')
+    if (parts.length !== 3) return null
+    const [headerB64, payloadB64, sigB64] = parts
+
+    const key = await crypto.subtle.importKey(
+      'raw',
+      new TextEncoder().encode(secret),
+      { name: 'HMAC', hash: 'SHA-256' },
+      false,
+      ['verify'],
+    )
+    const sigBytes = Uint8Array.from(
+      atob(sigB64.replace(/-/g, '+').replace(/_/g, '/')),
+      (c) => c.charCodeAt(0),
+    )
+    const valid = await crypto.subtle.verify(
+      'HMAC', key, sigBytes,
+      new TextEncoder().encode(`${headerB64}.${payloadB64}`),
+    )
+    if (!valid) return null
+
+    const payload = JSON.parse(atob(payloadB64.replace(/-/g, '+').replace(/_/g, '/')))
+    if (payload.exp && payload.exp < Date.now() / 1000) return null
+    if (!payload.sub) return null
+    return { sub: payload.sub, email: payload.email }
+  } catch {
+    return null
+  }
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
 
@@ -15,19 +50,15 @@ serve(async (req) => {
   if (!token) return new Response('Unauthorized', { status: 401, headers: corsHeaders })
 
   const supabaseUrl     = Deno.env.get('SUPABASE_URL')!
-  const anonKey         = Deno.env.get('SUPABASE_ANON_KEY')!
   const supabaseService = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+  const jwtSecret       = Deno.env.get('SUPABASE_JWT_SECRET')!
   const stripeKey       = Deno.env.get('STRIPE_SECRET_KEY')!
   const priceId         = Deno.env.get('STRIPE_SCHOLAR_MONTHLY_PRICE_ID')!
 
-  // Cryptographically verify the JWT via Supabase auth
-  const userClient = createClient(supabaseUrl, anonKey, {
-    global: { headers: { Authorization: `Bearer ${token}` } },
-  })
-  const { data: { user }, error: authError } = await userClient.auth.getUser()
-  if (authError || !user) return new Response('Unauthorized', { status: 401, headers: corsHeaders })
-  const userId = user.id
-  const email = user.email
+  const claims = await verifyJWT(token, jwtSecret)
+  if (!claims) return new Response('Unauthorized', { status: 401, headers: corsHeaders })
+  const userId = claims.sub
+  const email  = claims.email
 
   const db = createClient(supabaseUrl, supabaseService)
 
