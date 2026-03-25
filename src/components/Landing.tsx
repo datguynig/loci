@@ -1156,7 +1156,7 @@ export default function Landing() {
             <div style={{ padding: '16px 20px 24px' }}>
               <ul style={{ margin: 0, padding: '0 0 0 16px', fontFamily: 'var(--font-ui)', fontSize: 13, lineHeight: 2, opacity: 0.8 }}>
                 <li>Everything in Reader</li>
-                <li>Narration Pro — audiobook-quality voices</li>
+                <li>Loci Narration Pro — audiobook-quality voices</li>
                 <li>Practice Quizzes</li>
                 <li>Chapter Briefs</li>
                 <li>Study Guide</li>
@@ -1175,9 +1175,11 @@ export default function Landing() {
         </div>
       </section>
 
-      <p style={{ textAlign: 'center', fontSize: 12, opacity: 0.45, fontFamily: 'var(--font-ui)', margin: '0 0 0', paddingBottom: 0, color: 'var(--text-tertiary)' }}>
-        Loci uses advanced language models to power Practice Quizzes, Chapter Briefs, and Study Guide.
-      </p>
+      <div style={{ padding: '0 24px', background: 'var(--bg-secondary)' }}>
+        <p style={{ textAlign: 'center', fontSize: 12, opacity: 0.45, fontFamily: 'var(--font-ui)', color: 'var(--text-tertiary)', margin: '0 auto', paddingBottom: 32, maxWidth: 600 }}>
+          Loci uses advanced language models to power Practice Quizzes, Chapter Briefs, and Study Guide.
+        </p>
+      </div>
 
       {/* ── 12. FAQ ─────────────────────────────────────────────────────────── */}
       <section id="faq" style={{ padding: isMobile ? '80px 24px' : '100px 24px', background: 'var(--bg-primary)' }}>
