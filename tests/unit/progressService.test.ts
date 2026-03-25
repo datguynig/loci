@@ -9,6 +9,7 @@ function makeChain(result: { data: unknown; error: unknown }) {
     select: vi.fn().mockReturnThis(),
     eq: vi.fn().mockReturnThis(),
     single: vi.fn().mockReturnValue(p),
+    maybeSingle: vi.fn().mockReturnValue(p),
     upsert: vi.fn().mockReturnValue(p),
     then: p.then.bind(p),
     catch: p.catch.bind(p),

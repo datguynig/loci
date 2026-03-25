@@ -1,9 +1,10 @@
-import { useState, useRef, useCallback, useEffect } from 'react'
+import { useState, useRef, useCallback, useEffect, type ReactNode } from 'react'
+import { PLAN_PRICES } from '../utils/plans'
 import OnboardingWelcome from './OnboardingWelcome'
 import { motion, AnimatePresence } from 'framer-motion'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { GetToken } from '../services/storageService'
-import { UserButton } from '@clerk/clerk-react'
+import { UserButton, useClerk } from '@clerk/clerk-react'
 import { useLibrary } from '../hooks/useLibrary'
 import { getBookFile, markLastRead, type Book } from '../services/bookService'
 import { loadProgress } from '../services/progressService'
@@ -12,6 +13,129 @@ import BookDetailModal from './BookDetailModal'
 import ThemeToggle from './ThemeToggle'
 import type { ColorScheme } from '../hooks/usePreferences'
 import { useWindowWidth } from '../hooks/useWindowWidth'
+import type { SubscriptionState } from '../hooks/useSubscription'
+
+// ─── Subscription page (rendered inside Clerk UserButton profile modal) ──────
+
+function SubscriptionIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="2" y="5" width="20" height="14" rx="2" />
+      <line x1="2" y1="10" x2="22" y2="10" />
+    </svg>
+  )
+}
+
+const TIER_LABELS: Record<string, string> = {
+  free: 'Free',
+  reader: 'Loci Reader',
+  scholar: 'Loci Scholar',
+}
+
+const TIER_COLORS: Record<string, string> = {
+  free: 'var(--text-tertiary)',
+  reader: 'var(--accent)',
+  scholar: 'var(--accent-warm)',
+}
+
+function SubscriptionPage({
+  subscription,
+  onUpgrade,
+  supabase,
+}: {
+  subscription: SubscriptionState
+  onUpgrade: () => void
+  supabase: SupabaseClient
+}) {
+  const { closeUserProfile } = useClerk()
+  const [portalLoading, setPortalLoading] = useState(false)
+
+  function handleUpgrade() {
+    closeUserProfile()
+    // Wait for Clerk modal close animation before opening UpgradeModal
+    setTimeout(onUpgrade, 200)
+  }
+  const tier = subscription.tier
+  const tierLabel = TIER_LABELS[tier] ?? 'Free'
+  const tierColor = TIER_COLORS[tier] ?? 'var(--text-tertiary)'
+
+  const row = (label: string, value: ReactNode) => (
+    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 0', borderBottom: '1px solid var(--border)' }}>
+      <span style={{ fontFamily: 'var(--font-ui)', fontSize: 13, color: 'var(--text-secondary)' }}>{label}</span>
+      <span style={{ fontFamily: 'var(--font-ui)', fontSize: 13, fontWeight: 600, color: 'var(--text-primary)' }}>{value}</span>
+    </div>
+  )
+
+  async function handleManageBilling() {
+    setPortalLoading(true)
+    try {
+      const { openCustomerPortal } = await import('../services/subscriptionService')
+      await openCustomerPortal(async () => {
+        const { data } = await supabase.auth.getSession()
+        return data.session?.access_token ?? null
+      })
+    } finally {
+      setPortalLoading(false)
+    }
+  }
+
+  return (
+    <div style={{ fontFamily: 'var(--font-ui)' }}>
+      {/* Tier badge */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, background: 'var(--accent-subtle)', borderRadius: 12, padding: '16px 18px', marginBottom: 20 }}>
+        <div style={{ width: 36, height: 36, borderRadius: 10, background: 'var(--bg-surface)', border: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: tierColor, flexShrink: 0 }}>
+          <SubscriptionIcon />
+        </div>
+        <div>
+          <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase' as const, letterSpacing: '0.08em', color: 'var(--text-tertiary)', marginBottom: 2 }}>Current plan</div>
+          <div style={{ fontFamily: 'var(--font-display)', fontSize: 17, fontWeight: 700, color: tierColor }}>{tierLabel}</div>
+        </div>
+        {tier !== 'free' && (
+          <div style={{ marginLeft: 'auto', textAlign: 'right' as const }}>
+            <div style={{ fontSize: 11, color: 'var(--text-tertiary)', fontWeight: 500, textTransform: 'capitalize' as const }}>{subscription.status}</div>
+          </div>
+        )}
+      </div>
+
+      {/* Details */}
+      <div style={{ marginBottom: 20 }}>
+        {row('Plan', tierLabel)}
+        {subscription.isTrialing && subscription.trialEndsAt && row(
+          'Trial ends',
+          <span style={{ color: 'var(--accent-warm)', fontWeight: 600 }}>
+            {subscription.trialEndsAt.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
+          </span>
+        )}
+        {tier !== 'free' && row('Billing', tier === 'reader' ? `${PLAN_PRICES.reader.monthly}/mo or ${PLAN_PRICES.reader.annual}/yr` : `${PLAN_PRICES.scholar.monthly}/mo or ${PLAN_PRICES.scholar.annual}/yr`)}
+        {tier === 'free' && !subscription.isTrialing && row('Features', '5 books, device voice')}
+      </div>
+
+      {/* CTA */}
+      {tier === 'free' ? (
+        <button
+          onClick={handleUpgrade}
+          style={{ width: '100%', padding: '12px 0', borderRadius: 10, border: 'none', background: 'var(--accent)', color: 'var(--bg-primary)', fontSize: 14, fontWeight: 700, cursor: 'pointer', fontFamily: 'var(--font-ui)' }}
+        >
+          Upgrade to Reader or Scholar
+        </button>
+      ) : (
+        <button
+          onClick={handleManageBilling}
+          disabled={portalLoading}
+          style={{ width: '100%', padding: '12px 0', borderRadius: 10, border: '1.5px solid var(--border)', background: 'transparent', color: 'var(--text-primary)', fontSize: 14, fontWeight: 600, cursor: portalLoading ? 'default' : 'pointer', fontFamily: 'var(--font-ui)', opacity: portalLoading ? 0.6 : 1, transition: 'opacity 150ms' }}
+        >
+          {portalLoading ? 'Opening billing portal…' : 'Manage billing'}
+        </button>
+      )}
+
+      <p style={{ fontSize: 12, color: 'var(--text-tertiary)', margin: '12px 0 0', lineHeight: 1.6, textAlign: 'center' as const }}>
+        {tier === 'free'
+          ? 'Upgrade to unlock narration, unlimited books, and study tools.'
+          : 'Change plan, update payment method, download invoices, or cancel.'}
+      </p>
+    </div>
+  )
+}
 
 // ─── Appearance settings page (rendered inside Clerk UserButton profile modal) ─
 
@@ -131,9 +255,11 @@ interface LibraryProps {
   onThemeToggle: () => void
   colorScheme: ColorScheme
   onColorSchemeToggle: () => void
+  subscription: SubscriptionState
+  onUpgrade: () => void
 }
 
-export default function Library({ supabase, getStorageToken, onOpenBook, theme, onThemeToggle, colorScheme, onColorSchemeToggle }: LibraryProps) {
+export default function Library({ supabase, getStorageToken, onOpenBook, theme, onThemeToggle, colorScheme, onColorSchemeToggle, subscription, onUpgrade }: LibraryProps) {
   const width = useWindowWidth()
   const isMobile = width < 600
   const { books, loading, uploadState, uploadError, upload, refresh } = useLibrary(supabase, getStorageToken)
@@ -152,10 +278,15 @@ export default function Library({ supabase, getStorageToken, onOpenBook, theme, 
       if (!files?.length) return
       const file = files[0]
       if (!file.name.toLowerCase().endsWith('.epub')) return
+      // Free tier: cap at 5 books
+      if (!subscription.canAccess('unlimited-books') && books.length >= 5) {
+        onUpgrade()
+        return
+      }
       const book = await upload(file)
       if (book) onOpenBook(file, book.id)
     },
-    [upload, onOpenBook],
+    [upload, onOpenBook, subscription, books.length, onUpgrade],
   )
 
   const handleOpenBook = useCallback(
@@ -308,7 +439,25 @@ export default function Library({ supabase, getStorageToken, onOpenBook, theme, 
               </>
             )}
           </button>
+          {!subscription.canAccess('unlimited-books') && books.length >= 5 && (
+            <div style={{ fontFamily: 'var(--font-ui)', fontSize: 12, color: 'var(--text-tertiary)', marginTop: 6, textAlign: 'center' }}>
+              Free plan: 5 books maximum.{' '}
+              <button
+                onClick={onUpgrade}
+                style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--accent)', fontSize: 12, padding: 0, fontFamily: 'inherit', textDecoration: 'underline' }}
+              >
+                Upgrade to add more
+              </button>
+            </div>
+          )}
           <UserButton>
+            <UserButton.UserProfilePage label="Subscription" url="subscription" labelIcon={<SubscriptionIcon />}>
+              <SubscriptionPage
+                subscription={subscription}
+                onUpgrade={onUpgrade}
+                supabase={supabase}
+              />
+            </UserButton.UserProfilePage>
             <UserButton.UserProfilePage label="Appearance" url="appearance" labelIcon={<PaletteIcon />}>
               <AppearanceSettingsPage
                 theme={theme}

@@ -72,6 +72,11 @@ export function useSpeech(options?: {
   const wordTimingsRef = useRef<WordTiming[]>([])
   const lastWordIndexRef = useRef(-1)
 
+  // Incremented on every speak/speakFromHint call. playElevenLabsSentence captures
+  // the generation before each await; if it differs after the await, a newer call
+  // has taken over and the resolved audio must be discarded (prevents double-play).
+  const playbackGenerationRef = useRef(0)
+
   // Refs for stable callbacks (avoid stale closures in async loops)
   const currentAudioRef = useRef<HTMLAudioElement | null>(null)
   const sentencesRef = useRef<string[]>([])
@@ -157,6 +162,11 @@ export function useSpeech(options?: {
         return
       }
 
+      // Capture generation before the network round-trip. If a newer speak/
+      // speakFromHint call fires while we await, the generation will differ and
+      // we must discard the resolved audio to prevent double-play.
+      const generation = playbackGenerationRef.current
+
       setCurrentSentenceIndex(idx)
       indexRef.current = idx
 
@@ -177,6 +187,17 @@ export function useSpeech(options?: {
             playElevenLabsSentence(idx + 1)
           }
         )
+
+        // A newer playback session started while this request was in-flight.
+        // streamSentence already called audio.play() internally — stop it.
+        if (playbackGenerationRef.current !== generation) {
+          if (result) {
+            result.audio.pause()
+            result.audio.src = ''
+          }
+          return
+        }
+
         if (!result) {
           playBrowserSentence(idx)
           return
@@ -196,7 +217,9 @@ export function useSpeech(options?: {
         })
       } catch {
         // ElevenLabs failed — fall back to browser TTS for this sentence
-        playBrowserSentence(idx)
+        if (playbackGenerationRef.current === generation) {
+          playBrowserSentence(idx)
+        }
       }
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -244,6 +267,9 @@ export function useSpeech(options?: {
 
   const speak = useCallback(
     (text: string) => {
+      // Invalidate any in-flight ElevenLabs requests before starting new playback
+      playbackGenerationRef.current += 1
+
       // Stop any existing playback
       if (isPlayingRef.current) {
         isPlayingRef.current = false
@@ -381,6 +407,9 @@ export function useSpeech(options?: {
         s.replace(/\s+/g, ' ').toLowerCase().includes(normHint.slice(0, 20))
       )
       if (startIdx < 0) startIdx = 0
+
+      // Invalidate any in-flight ElevenLabs requests before starting new playback
+      playbackGenerationRef.current += 1
 
       // Stop any current playback
       isPlayingRef.current = false

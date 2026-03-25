@@ -394,16 +394,16 @@ const FAQ_ITEMS = [
     a: 'EPUB only. Most ebooks from publishers and sources like Project Gutenberg are available in EPUB. Kindle files can be converted to EPUB using free tools like Calibre.',
   },
   {
-    q: 'How is Loci different from just copying text into ChatGPT?',
-    a: "You'd have to paste in chapter text every time — and it wouldn't know your highlights or notes. Loci already has your chapter, your highlights, and your notes. The study tools are built into the book.",
+    q: 'How is Loci different from other reading apps?',
+    a: "Loci is built around your own book collection — not a catalog you subscribe to. You bring your EPUB files; Loci handles the narration, study tools, and cross-device sync. Your library, your annotations, and your progress are yours.",
   },
   {
     q: 'How does narration work?',
-    a: 'Narration is included with every Pro subscription. Pick from multiple voices — one for speed, one for long sessions. Each sentence is highlighted in the text as it\'s spoken. No separate account required.',
+    a: "Loci Narration is included with every Reader and Scholar subscription. Reader includes Loci Narration with natural, lifelike voices. Scholar adds Loci Narration Pro — expressive, audiobook-quality voices. Each sentence is highlighted in the text as it's spoken.",
   },
   {
     q: 'What happens when the free trial ends?',
-    a: 'If you do not cancel before the 7-day trial ends, your subscription starts at $9/month. You can cancel anytime from your account settings — no waiting periods, no hoops.',
+    a: "After your 7-day trial you can choose Reader ($7.99/month or $79/year) or Scholar ($13.99/month or $139/year), or continue using Loci for free with up to 5 books and your device's built-in voice. No charge until you add a payment method.",
   },
 ]
 
@@ -460,6 +460,7 @@ export default function Landing() {
   const windowWidth = useWindowWidth()
   const isMobile = windowWidth < 768
   const [menuOpen, setMenuOpen] = useState(false)
+  const [pricingInterval, setPricingInterval] = useState<'monthly' | 'annual'>('monthly')
 
   // Navigation background adapts to theme
   const navBg = theme === 'dark' ? 'rgba(17,17,16,0.92)' : 'rgba(248,247,244,0.92)'
@@ -812,7 +813,7 @@ export default function Landing() {
         </div>
       </section>
 
-      {/* ── 5. ElevenLabs section ───────────────────────────────────────────── */}
+      {/* ── 5. Narration section ────────────────────────────────────────────── */}
       <section style={{ background: 'var(--bg-secondary)', padding: isMobile ? '80px 0' : '100px 0', overflow: 'hidden' }}>
         {/* Header */}
         <div style={{ textAlign: 'center', padding: '0 24px', marginBottom: 48 }}>
@@ -1088,86 +1089,134 @@ export default function Landing() {
 
       {/* ── 11. Pricing ──────────────────────────────────────────────────────── */}
       <section id="pricing" style={{ padding: isMobile ? '80px 24px' : '100px 24px', background: 'var(--bg-secondary)', textAlign: 'center' }}>
-        <motion.div {...inView} style={{ marginBottom: 52 }}>
+        <motion.div {...inView} style={{ marginBottom: 44 }}>
           <span style={labelStyle}>PRICING</span>
           <h2 style={{ ...h2Style, textAlign: 'center', margin: '12px 0 0' }}>Start free. Upgrade when you're ready.</h2>
         </motion.div>
-        <div style={{ maxWidth: 820, margin: '0 auto', display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: 20, alignItems: 'start' }}>
-          {/* Free card */}
-          <motion.div
-            initial={{ opacity: 0, y: 24 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ duration: 0.5 }}
-            style={{ background: 'var(--bg-surface)', border: '1px solid var(--border)', borderRadius: 20, padding: isMobile ? '32px 24px' : '40px 36px', textAlign: 'left', opacity: theme === 'dark' ? 0.6 : 0.85 }}
+
+        {/* Billing interval toggle */}
+        <div style={{ display: 'inline-flex', alignItems: 'center', gap: 12, marginBottom: 52, fontFamily: 'var(--font-ui)', fontSize: 13, color: 'var(--text-primary)', background: 'var(--bg-surface)', border: '1px solid var(--border)', borderRadius: 99, padding: '6px 16px 6px 12px' }}>
+          <button
+            role="switch"
+            aria-checked={pricingInterval === 'annual'}
+            aria-label="Toggle annual billing"
+            onClick={() => setPricingInterval(i => i === 'monthly' ? 'annual' : 'monthly')}
+            style={{ width: 40, height: 22, borderRadius: 11, border: 'none', cursor: 'pointer', position: 'relative' as const, background: pricingInterval === 'annual' ? 'var(--accent)' : 'var(--border)', transition: 'background 220ms', flexShrink: 0, padding: 0 }}
           >
-            <div style={{ fontFamily: 'var(--font-ui)', fontSize: 11, letterSpacing: '0.1em', color: 'var(--text-tertiary)', fontWeight: 600, marginBottom: 16 }}>FREE</div>
-            <div style={{ display: 'flex', alignItems: 'flex-end', gap: 2, marginBottom: 6 }}>
-              <span style={{ fontFamily: 'var(--font-display)', fontSize: 22, color: 'var(--text-secondary)', marginBottom: 8 }}>$</span>
-              <span style={{ fontFamily: 'var(--font-display)', fontSize: 52, fontWeight: 700, color: 'var(--text-primary)', lineHeight: 1 }}>0</span>
-            </div>
-            <p style={{ fontFamily: 'var(--font-ui)', fontSize: 13, color: 'var(--text-tertiary)', margin: '0 0 28px' }}>No credit card. Ever.</p>
-            <ul style={{ listStyle: 'none', padding: 0, margin: '0 0 32px', display: 'flex', flexDirection: 'column', gap: 11 }}>
-              {[
-                'Unlimited ebook reading',
-                'Highlights and notes',
-                'Dark mode and font settings',
-              ].map((feature) => (
-                <li key={feature} style={{ fontFamily: 'var(--font-ui)', fontSize: 14, color: 'var(--text-secondary)', display: 'flex', alignItems: 'flex-start', gap: 10 }}>
-                  <span style={{ color: 'var(--accent-warm)', fontWeight: 700, flexShrink: 0 }}>✓</span>
-                  {feature}
+            <span style={{ position: 'absolute' as const, top: 2, left: pricingInterval === 'annual' ? 20 : 2, width: 18, height: 18, borderRadius: 9, background: 'var(--bg-surface)', boxShadow: '0 1px 3px rgba(0,0,0,0.18)', transition: 'left 220ms', display: 'block' }} />
+          </button>
+          <span style={{ fontWeight: 500, color: pricingInterval === 'annual' ? 'var(--text-primary)' : 'var(--text-tertiary)', transition: 'color 150ms' }}>
+            {pricingInterval === 'annual'
+              ? <><span style={{ color: 'var(--accent)', fontWeight: 700 }}>Annual</span> — 2 months free</>
+              : 'Switch to annual and save 2 months'}
+          </span>
+        </div>
+
+        <div style={{ maxWidth: 980, margin: '0 auto', display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr 1fr', gap: isMobile ? 16 : 18, alignItems: 'stretch' }}>
+
+          {/* ── Free ── */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ duration: 0.45 }}
+            style={{ background: 'var(--bg-surface)', border: '1px solid var(--border)', borderRadius: 20, textAlign: 'left', display: 'flex', flexDirection: 'column' as const, padding: '28px 28px 24px', opacity: 0.8 }}
+          >
+            <div style={{ fontFamily: 'var(--font-ui)', fontSize: 10, fontWeight: 800, textTransform: 'uppercase' as const, letterSpacing: '0.12em', color: 'var(--text-tertiary)', marginBottom: 20 }}>Free</div>
+            <div style={{ fontFamily: 'var(--font-display)', fontSize: 48, fontWeight: 800, lineHeight: 1, color: 'var(--text-primary)', marginBottom: 6 }}>$0</div>
+            <div style={{ fontFamily: 'var(--font-ui)', fontSize: 13, color: 'var(--text-tertiary)', marginBottom: 28 }}>Always free</div>
+            <ul style={{ margin: 0, padding: 0, listStyle: 'none', display: 'flex', flexDirection: 'column' as const, gap: 13, flex: 1, fontFamily: 'var(--font-ui)', fontSize: 13.5, color: 'var(--text-primary)', lineHeight: 1.4 }}>
+              {['Up to 5 books', 'Device voice (unlimited)', 'Bookmarks & progress sync', 'Annotations & highlights'].map(f => (
+                <li key={f} style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
+                  <span style={{ color: 'var(--text-tertiary)', lineHeight: '20px', flexShrink: 0 }}>—</span>
+                  <span>{f}</span>
                 </li>
               ))}
             </ul>
-            <motion.button whileHover={{ scale: 1.01 }} whileTap={{ scale: 0.98 }} onClick={() => openSignUp()}
-              style={{ background: 'transparent', color: 'var(--text-primary)', fontFamily: 'var(--font-ui)', fontSize: 14, fontWeight: 600, padding: '13px 24px', borderRadius: 10, border: '1.5px solid var(--border)', cursor: 'pointer', width: '100%', opacity: 0.8 }}>
+            <motion.button whileHover={{ opacity: 1 }} whileTap={{ scale: 0.98 }} onClick={() => openSignUp()}
+              style={{ background: 'transparent', color: 'var(--text-primary)', fontFamily: 'var(--font-ui)', fontSize: 14, fontWeight: 600, padding: '13px 0', borderRadius: 10, border: '1.5px solid var(--border)', cursor: 'pointer', width: '100%', marginTop: 28 }}>
               Start reading free
             </motion.button>
           </motion.div>
 
-          {/* Pro card */}
+          {/* ── Reader ── */}
           <motion.div
-            initial={{ opacity: 0, y: 24 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ duration: 0.5, delay: 0.1 }}
+            initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ duration: 0.45, delay: 0.07 }}
+            style={{ background: 'var(--bg-surface)', border: '1.5px solid var(--accent)', borderRadius: 20, textAlign: 'left', display: 'flex', flexDirection: 'column' as const, padding: '28px 28px 24px' }}
+          >
+            <div style={{ fontFamily: 'var(--font-ui)', fontSize: 10, fontWeight: 800, textTransform: 'uppercase' as const, letterSpacing: '0.12em', color: 'var(--accent)', marginBottom: 20 }}>Loci Reader</div>
+            <div style={{ display: 'flex', alignItems: 'baseline', gap: 3, marginBottom: 6 }}>
+              <span style={{ fontFamily: 'var(--font-display)', fontSize: 48, fontWeight: 800, lineHeight: 1, color: 'var(--text-primary)' }}>
+                {pricingInterval === 'monthly' ? '$7.99' : '$6.58'}
+              </span>
+              <span style={{ fontFamily: 'var(--font-ui)', fontSize: 15, color: 'var(--text-tertiary)', marginLeft: 2 }}>/mo</span>
+            </div>
+            <div style={{ fontFamily: 'var(--font-ui)', fontSize: 13, color: 'var(--text-tertiary)', marginBottom: 28 }}>
+              {pricingInterval === 'monthly' ? 'or $79/yr · save 2 months' : '$79 billed annually'}
+            </div>
+            <ul style={{ margin: 0, padding: 0, listStyle: 'none', display: 'flex', flexDirection: 'column' as const, gap: 13, flex: 1, fontFamily: 'var(--font-ui)', fontSize: 13.5, color: 'var(--text-primary)', lineHeight: 1.4 }}>
+              {['Unlimited books', 'Loci Narration — lifelike voices', 'Word-by-word highlighting', 'Multiple voice choices', 'Scratchpad'].map(f => (
+                <li key={f} style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
+                  <span style={{ color: 'var(--accent)', fontWeight: 700, lineHeight: '20px', flexShrink: 0 }}>✓</span>
+                  <span>{f}</span>
+                </li>
+              ))}
+            </ul>
+            <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }} onClick={() => openSignUp()}
+              style={{ background: 'var(--accent)', color: 'var(--bg-primary)', fontFamily: 'var(--font-display)', fontStyle: 'italic' as const, fontSize: 16, fontWeight: 700, padding: '14px 0', borderRadius: 10, border: 'none', cursor: 'pointer', width: '100%', marginTop: 28 }}>
+              Start 7-day free trial
+            </motion.button>
+          </motion.div>
+
+          {/* ── Scholar ── */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ duration: 0.45, delay: 0.14 }}
             style={{
               background: 'var(--bg-surface)',
-              backgroundImage: 'linear-gradient(rgba(255,255,255,0.04), rgba(255,255,255,0.015))',
-              border: '1px solid var(--border)',
+              border: '1.5px solid var(--accent-warm)',
               borderRadius: 20,
-              padding: isMobile ? '32px 24px' : '40px 36px',
               textAlign: 'left',
-              boxShadow: theme === 'dark'
-                ? '0 0 0 1px rgba(212,174,74,0.12), 0 0 80px rgba(212,174,74,0.08), 0 40px 100px rgba(0,0,0,0.55)'
-                : '0 0 0 1px rgba(0,0,0,0.06), 0 24px 64px rgba(0,0,0,0.13)',
-              position: 'relative',
-              transform: isMobile ? 'none' : 'translateY(-14px)',
+              display: 'flex',
+              flexDirection: 'column' as const,
+              padding: '28px 28px 24px',
+              position: 'relative' as const,
+              boxShadow: '0 0 0 4px var(--accent-warm-highlight), 0 8px 40px var(--shadow)',
             }}
           >
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
-                <div style={{ fontFamily: 'var(--font-ui)', fontSize: 12, letterSpacing: '0.1em', color: 'var(--accent-warm)', fontWeight: 700 }}>PRO</div>
-                <span style={{ fontFamily: 'var(--font-ui)', fontSize: 9, letterSpacing: '0.08em', fontWeight: 700, color: 'var(--accent-warm)', background: 'var(--accent-warm-highlight)', padding: '3px 8px', borderRadius: 4 }}>RECOMMENDED</span>
-              </div>
-              <div style={{ display: 'flex', alignItems: 'flex-end', gap: 4, marginBottom: 6 }}>
-                <span style={{ fontFamily: 'var(--font-display)', fontSize: 20, color: 'var(--text-secondary)', marginBottom: 10 }}>$</span>
-                <span style={{ fontFamily: 'var(--font-display)', fontSize: 52, fontWeight: 700, color: 'var(--text-primary)', lineHeight: 1 }}>9</span>
-                <span style={{ fontFamily: 'var(--font-ui)', fontSize: 14, color: 'var(--text-secondary)', marginBottom: 8 }}>/month</span>
-              </div>
-              <p style={{ fontFamily: 'var(--font-ui)', fontSize: 13, color: 'var(--text-tertiary)', margin: '0 0 28px' }}>Everything in Free, plus:</p>
-              <ul style={{ listStyle: 'none', padding: 0, margin: '0 0 32px', display: 'flex', flexDirection: 'column', gap: 11 }}>
-                {[
-                  'Natural narration — multiple voices',
-                  'Study assistant (summaries, quizzes, flashcards)',
-                  'Export your highlights and notes as plain text',
-                ].map((feature) => (
-                  <li key={feature} style={{ fontFamily: 'var(--font-ui)', fontSize: 14, color: 'var(--text-secondary)', display: 'flex', alignItems: 'flex-start', gap: 10 }}>
-                    <span style={{ color: 'var(--accent-warm)', fontWeight: 700, flexShrink: 0 }}>✓</span>
-                    {feature}
-                  </li>
-                ))}
-              </ul>
-              <motion.button whileHover={{ scale: 1.02, boxShadow: '0 8px 24px rgba(0,0,0,0.15)' }} whileTap={{ scale: 0.98 }} onClick={() => openSignUp()}
-                style={{ background: 'var(--text-primary)', color: 'var(--bg-primary)', fontFamily: 'var(--font-display)', fontStyle: 'italic', fontSize: 16, padding: '15px 24px', borderRadius: 12, border: 'none', cursor: 'pointer', width: '100%', marginBottom: 10 }}>
-                Start 7-day free trial
-              </motion.button>
-              <p style={{ fontFamily: 'var(--font-ui)', fontSize: 12, color: 'var(--text-tertiary)', margin: 0, textAlign: 'center' }}>No credit card required · cancel anytime</p>
+            {/* Inline badge next to tier label */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 20 }}>
+              <div style={{ fontFamily: 'var(--font-ui)', fontSize: 10, fontWeight: 800, textTransform: 'uppercase' as const, letterSpacing: '0.12em', color: 'var(--accent-warm)' }}>Loci Scholar</div>
+              <span style={{ background: 'var(--accent-warm)', color: 'var(--bg-primary)', fontSize: 9, fontWeight: 800, padding: '3px 8px', borderRadius: 99, letterSpacing: '0.08em', fontFamily: 'var(--font-ui)', lineHeight: 1 }}>MOST POPULAR</span>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'baseline', gap: 3, marginBottom: 6 }}>
+              <span style={{ fontFamily: 'var(--font-display)', fontSize: 48, fontWeight: 800, lineHeight: 1, color: 'var(--text-primary)' }}>
+                {pricingInterval === 'monthly' ? '$13.99' : '$11.58'}
+              </span>
+              <span style={{ fontFamily: 'var(--font-ui)', fontSize: 15, color: 'var(--text-tertiary)', marginLeft: 2 }}>/mo</span>
+            </div>
+            <div style={{ fontFamily: 'var(--font-ui)', fontSize: 13, color: 'var(--text-tertiary)', marginBottom: 28 }}>
+              {pricingInterval === 'monthly' ? 'or $139/yr · save 2 months' : '$139 billed annually'}
+            </div>
+            <ul style={{ margin: 0, padding: 0, listStyle: 'none', display: 'flex', flexDirection: 'column' as const, gap: 13, flex: 1, fontFamily: 'var(--font-ui)', fontSize: 13.5, color: 'var(--text-primary)', lineHeight: 1.4 }}>
+              {['Everything in Reader', 'Loci Narration Pro — audiobook-quality voices', 'Practice Quizzes', 'Chapter Briefs', 'Study Guide', 'Flashcards'].map(f => (
+                <li key={f} style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
+                  <span style={{ color: 'var(--accent-warm)', fontWeight: 700, lineHeight: '20px', flexShrink: 0 }}>✓</span>
+                  <span>{f}</span>
+                </li>
+              ))}
+            </ul>
+            <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }} onClick={() => openSignUp()}
+              style={{ background: 'var(--accent-warm)', color: 'var(--bg-primary)', fontFamily: 'var(--font-display)', fontStyle: 'italic' as const, fontSize: 16, fontWeight: 700, padding: '14px 0', borderRadius: 10, border: 'none', cursor: 'pointer', width: '100%', marginTop: 28 }}>
+              Start 7-day free trial
+            </motion.button>
           </motion.div>
+
         </div>
+
+        {/* Global note below all cards */}
+        <p style={{ fontFamily: 'var(--font-ui)', fontSize: 13, color: 'var(--text-tertiary)', textAlign: 'center', margin: '20px auto 0', maxWidth: 420 }}>
+          No credit card required · cancel anytime
+        </p>
+        <p style={{ textAlign: 'center', fontSize: 12, color: 'var(--text-tertiary)', opacity: 0.45, fontFamily: 'var(--font-ui)', margin: '10px auto 0', maxWidth: 560, lineHeight: 1.6 }}>
+          Practice Quizzes, Chapter Briefs, and Study Guide are powered by advanced language models.
+        </p>
       </section>
 
       {/* ── 12. FAQ ─────────────────────────────────────────────────────────── */}

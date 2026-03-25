@@ -7,6 +7,7 @@ import { sendStudyMessage } from '../services/aiStudyService'
 import type { StudyContext, Message } from '../services/aiStudyService'
 import { saveQuizSession } from '../services/quizService'
 import type { QuizQuestion } from '../services/quizService'
+import type { SubscriptionState, SubscriptionFeature } from '../hooks/useSubscription'
 
 interface StudyPanelProps {
   isOpen: boolean
@@ -21,6 +22,8 @@ interface StudyPanelProps {
   reviewMode?: { chapterHref: string }
   reviewFlashcards?: import('../services/flashcardService').Flashcard[]
   onMarkReviewed?: (id: string) => void
+  subscription?: SubscriptionState
+  onUpgrade?: () => void
 }
 
 // ─── Quiz state ────────────────────────────────────────────────────────────
@@ -124,6 +127,15 @@ function computeChips(context: StudyContext, hasNotes: boolean, hasFlashcards: b
   if (hasNotes) return ['Review my notes', 'Summarise chapter', 'Quiz from notes']
   if (hasFlashcards) return ['Summarise chapter', 'Quiz me', 'Review flashcards']
   return ['Summarise chapter', 'Quiz me', 'Make flashcards']
+}
+
+function featureForChip(chip: string): SubscriptionFeature | null {
+  const lc = chip.toLowerCase()
+  if (lc.includes('quiz') || lc.includes('test')) return 'practice-quizzes'
+  if (lc.includes('summar')) return 'chapter-briefs'
+  if (lc.includes('flashcard') || lc.includes('flash card')) return 'flashcards'
+  if (lc.includes('explain') || lc.includes('notes')) return 'study-guide'
+  return null
 }
 
 function isFlashcardArray(v: unknown): v is { front: string; back: string }[] {
@@ -365,6 +377,8 @@ export default function StudyPanel({
   reviewMode,
   reviewFlashcards,
   onMarkReviewed,
+  subscription,
+  onUpgrade,
 }: StudyPanelProps) {
   const { getToken } = useAuth()
   const [messages, setMessages] = useState<Message[]>([])
@@ -506,6 +520,20 @@ export default function StudyPanel({
     else if (isStartingNewQuiz || isStartingRetry) action = 'quiz'
     else if (lowerText.includes('explain') && !quizState.active) action = 'explain'
     else if (quizState.active) action = 'quiz'
+
+    // Gate by feature key
+    const featureForAction: Record<string, SubscriptionFeature> = {
+      quiz: 'practice-quizzes',
+      summarise: 'chapter-briefs',
+      flashcards: 'flashcards',
+      explain: 'study-guide',
+      chat: 'study-guide',
+    }
+    const requiredFeature = featureForAction[action] as SubscriptionFeature
+    if (subscription && requiredFeature && !subscription.canAccess(requiredFeature)) {
+      onUpgrade?.()
+      return
+    }
 
     let quizTotalForContext: number | undefined
     if (isStartingRetry) {
@@ -847,7 +875,15 @@ export default function StudyPanel({
                       textAlign: 'center',
                     }}
                   >
-                    {chip}
+                    <>
+                      {chip}
+                      {(() => {
+                        const feat = featureForChip(chip)
+                        return feat && subscription && !subscription.canAccess(feat)
+                          ? <span style={{ fontSize: 10, color: '#7c3aed', marginLeft: 4, fontWeight: 600 }}>Scholar</span>
+                          : null
+                      })()}
+                    </>
                   </button>
                 ))}
               </div>

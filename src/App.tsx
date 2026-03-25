@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { AnimatePresence } from 'framer-motion'
 import { SignedIn, SignedOut, useAuth, useUser } from '@clerk/clerk-react'
 import { Analytics } from '@vercel/analytics/react'
+import { SpeedInsights } from '@vercel/speed-insights/react'
 import Library from './components/Library'
 import Reader from './components/Reader'
 import Landing from './components/Landing'
@@ -11,7 +12,9 @@ import { usePreferences } from './hooks/usePreferences'
 import { createSupabaseClient } from './services/supabaseClient'
 import { syncPreferencesFromSupabase, pushPreferencesToSupabase } from './services/preferencesService'
 import type { FontSize, LayoutMode } from './hooks/useEpub'
-
+import { useSubscription } from './hooks/useSubscription'
+import UpgradeModal from './components/UpgradeModal'
+import TrialBanner from './components/TrialBanner'
 type LegalPage = 'terms' | 'privacy'
 
 function parseLegalHash(): LegalPage | null {
@@ -106,6 +109,19 @@ function AppContent() {
     [], // eslint-disable-line react-hooks/exhaustive-deps
   )
 
+  const subscription = useSubscription(supabase, user?.id)
+  const [upgradeOpen, setUpgradeOpen] = useState(false)
+
+  const handleUpgrade = useCallback(() => setUpgradeOpen(true), [])
+
+  const handleManageBilling = useCallback(async () => {
+    const { openCustomerPortal } = await import('./services/subscriptionService')
+    await openCustomerPortal(async () => {
+      const { data } = await supabase.auth.getSession()
+      return data.session?.access_token ?? null
+    })
+  }, [supabase])
+
   // Raw Clerk JWT for the storage API (no Supabase template — the presign-api
   // verifies against Clerk JWKS directly).
   const getStorageToken = useCallback(() => getTokenRef.current(), [getToken]) // eslint-disable-line react-hooks/exhaustive-deps
@@ -153,30 +169,53 @@ function AppContent() {
   }, [prefs.colorScheme, set])
 
   return (
-    <AnimatePresence mode="wait">
-      {!openBook ? (
-        <Library key="library" supabase={supabase} getStorageToken={getStorageToken} onOpenBook={handleOpenBook} theme={prefs.theme} onThemeToggle={handleThemeToggle} colorScheme={prefs.colorScheme} onColorSchemeToggle={handleColorSchemeToggle} />
-      ) : (
-        <Reader
-          key="reader"
-          file={openBook.file}
-          bookId={openBook.bookId}
-          supabase={supabase}
-          theme={prefs.theme}
-          fontSize={prefs.fontSize}
-          layoutMode={prefs.layoutMode}
-          highlightEnabled={prefs.highlightEnabled}
-          autoscrollEnabled={prefs.autoscrollEnabled}
-          onThemeToggle={handleThemeToggle}
-          onFontSizeChange={(s: FontSize) => set('fontSize', s)}
-          onLayoutModeChange={(m: LayoutMode) => set('layoutMode', m)}
-          onHighlightChange={(v: boolean) => set('highlightEnabled', v)}
-          onAutoscrollChange={(v: boolean) => set('autoscrollEnabled', v)}
-          onClose={() => setOpenBook(null)}
-          studyOptions={openBook.studyOptions}
+    <>
+      {(subscription.isTrialing || subscription.status === 'past_due') && (
+        <TrialBanner
+          trialEndsAt={subscription.trialEndsAt}
+          onUpgrade={handleUpgrade}
+          status={subscription.status}
+          onManageBilling={handleManageBilling}
         />
       )}
-    </AnimatePresence>
+      <AnimatePresence mode="wait">
+        {!openBook ? (
+          <Library key="library" supabase={supabase} getStorageToken={getStorageToken} onOpenBook={handleOpenBook} theme={prefs.theme} onThemeToggle={handleThemeToggle} colorScheme={prefs.colorScheme} onColorSchemeToggle={handleColorSchemeToggle} subscription={subscription} onUpgrade={handleUpgrade} />
+        ) : (
+          <Reader
+            key="reader"
+            file={openBook.file}
+            bookId={openBook.bookId}
+            supabase={supabase}
+            theme={prefs.theme}
+            fontSize={prefs.fontSize}
+            layoutMode={prefs.layoutMode}
+            highlightEnabled={prefs.highlightEnabled}
+            autoscrollEnabled={prefs.autoscrollEnabled}
+            onThemeToggle={handleThemeToggle}
+            onFontSizeChange={(s: FontSize) => set('fontSize', s)}
+            onLayoutModeChange={(m: LayoutMode) => set('layoutMode', m)}
+            onHighlightChange={(v: boolean) => set('highlightEnabled', v)}
+            onAutoscrollChange={(v: boolean) => set('autoscrollEnabled', v)}
+            onClose={() => setOpenBook(null)}
+            studyOptions={openBook.studyOptions}
+            subscription={subscription}
+            onUpgrade={handleUpgrade}
+          />
+        )}
+      </AnimatePresence>
+      <UpgradeModal
+        isOpen={upgradeOpen}
+        onClose={() => setUpgradeOpen(false)}
+        onCheckout={async (tier, interval) => {
+          const { createCheckoutSession } = await import('./services/subscriptionService')
+          await createCheckoutSession(tier, interval, async () => {
+            const { data } = await supabase.auth.getSession()
+            return data.session?.access_token ?? null
+          })
+        }}
+      />
+    </>
   )
 }
 
@@ -218,6 +257,7 @@ export default function App() {
         </div>
       )}
       <Analytics />
+      <SpeedInsights />
     </>
   )
 }
