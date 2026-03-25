@@ -31,12 +31,19 @@ async function getJwksKeys(jwksUrl: string): Promise<CryptoKey[]> {
   return _jwksKeys
 }
 
-// Verify a Clerk JWT using Clerk's public JWKS (RS256).
-async function verifyJWT(token: string, jwksUrl: string): Promise<{ sub: string; email?: string } | null> {
+// Verify a Clerk JWT. Supports both HS256 (Supabase JWT template) and RS256.
+async function verifyJWT(
+  token: string,
+  jwksUrl: string,
+  jwtSecretBase64: string,
+): Promise<{ sub: string; email?: string } | null> {
   try {
     const parts = token.split('.')
     if (parts.length !== 3) return null
     const [headerB64, payloadB64, sigB64] = parts
+
+    const header = JSON.parse(atob(headerB64.replace(/-/g, '+').replace(/_/g, '/')))
+    console.log('[verifyJWT] alg:', header.alg)
 
     const sigBytes = Uint8Array.from(
       atob(sigB64.replace(/-/g, '+').replace(/_/g, '/')),
@@ -44,14 +51,36 @@ async function verifyJWT(token: string, jwksUrl: string): Promise<{ sub: string;
     )
     const data = new TextEncoder().encode(`${headerB64}.${payloadB64}`)
 
-    const keys = await getJwksKeys(jwksUrl)
     let valid = false
-    for (const key of keys) {
-      try { valid = await crypto.subtle.verify('RSASSA-PKCS1-v1_5', key, sigBytes, data) } catch { /* wrong key */ }
-      if (valid) break
+
+    if (header.alg === 'RS256') {
+      const keys = await getJwksKeys(jwksUrl)
+      for (const key of keys) {
+        try { valid = await crypto.subtle.verify('RSASSA-PKCS1-v1_5', key, sigBytes, data) } catch { /* wrong key */ }
+        if (valid) break
+      }
+    } else if (header.alg === 'HS256') {
+      const decodedBytes = Uint8Array.from(
+        atob(jwtSecretBase64.replace(/-/g, '+').replace(/_/g, '/')),
+        c => c.charCodeAt(0),
+      )
+      const rawBytes = new TextEncoder().encode(jwtSecretBase64)
+
+      for (const secretBytes of [decodedBytes, rawBytes]) {
+        const key = await crypto.subtle.importKey(
+          'raw', secretBytes,
+          { name: 'HMAC', hash: 'SHA-256' }, false, ['verify'],
+        )
+        valid = await crypto.subtle.verify('HMAC', key, sigBytes, data)
+        if (valid) break
+      }
+    } else {
+      console.error('[verifyJWT] unsupported algorithm:', header.alg)
+      return null
     }
+
     if (!valid) {
-      console.error('[verifyJWT] signature invalid')
+      console.error('[verifyJWT] signature invalid for alg:', header.alg)
       return null
     }
 
@@ -79,13 +108,14 @@ serve(async (req) => {
   const supabaseUrl = Deno.env.get('SUPABASE_URL')!
   const serviceKey  = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
   const jwksUrl     = Deno.env.get('CLERK_JWKS_URL')!
+  const jwtSecret   = Deno.env.get('JWT_SECRET')!
   const appUrl      = Deno.env.get('APP_URL') ?? 'http://localhost:5173'
 
   if (!stripeKey || !serviceKey) {
     return new Response('Server misconfiguration', { status: 500, headers: corsHeaders })
   }
 
-  const claims = await verifyJWT(token, jwksUrl)
+  const claims = await verifyJWT(token, jwksUrl, jwtSecret)
   if (!claims) return new Response('Unauthorized', { status: 401, headers: corsHeaders })
   const userId = claims.sub
 
