@@ -111,6 +111,7 @@ serve(async (req) => {
   const jwtSecret        = Deno.env.get('JWT_SECRET')!
   const appUrl           = Deno.env.get('APP_URL') ?? 'http://localhost:5173'
   const masterCouponCode = Deno.env.get('STRIPE_MASTER_COUPON_CODE')
+  const adminEmail       = Deno.env.get('ADMIN_EMAIL')
 
   if (!stripeKey || !serviceKey) {
     return new Response('Server misconfiguration', { status: 500, headers: corsHeaders })
@@ -139,8 +140,10 @@ serve(async (req) => {
     .eq('user_id', userId)
     .maybeSingle()
 
-  // If a master coupon code is configured (for testing), pre-apply it.
+  // Pre-apply the master coupon only when the logged-in user is the admin.
+  // For everyone else, allow them to enter a promotion code manually.
   // 'allow_promotion_codes' and 'discounts' are mutually exclusive in Stripe.
+  const isAdmin = !!(masterCouponCode && adminEmail && claims.email === adminEmail)
   const checkoutBody: Record<string, string> = {
     mode: 'subscription',
     'line_items[0][price]': priceId,
@@ -148,8 +151,8 @@ serve(async (req) => {
     'subscription_data[metadata][user_id]': userId,
     success_url: `${appUrl}?checkout=success`,
     cancel_url:  `${appUrl}?checkout=cancel`,
-    ...(masterCouponCode
-      ? { 'discounts[0][coupon]': masterCouponCode }
+    ...(isAdmin
+      ? { 'discounts[0][coupon]': masterCouponCode! }
       : { 'allow_promotion_codes': 'true' }
     ),
   }
