@@ -19,6 +19,7 @@ export interface SubscriptionState {
   status: SubscriptionStatus
   trialEndsAt: Date | null
   isTrialing: boolean
+  isLoading: boolean
   canAccess: (feature: SubscriptionFeature) => boolean
 }
 
@@ -56,7 +57,17 @@ const LOADING_STATE: SubscriptionState = {
   status: 'loading',
   trialEndsAt: null,
   isTrialing: false,
+  isLoading: true,
   canAccess: () => false,
+}
+
+async function fetchRow(supabase: SupabaseClient, userId: string) {
+  const { data, error } = await supabase
+    .from('subscriptions')
+    .select('tier, status, trial_ends_at')
+    .eq('user_id', userId)
+    .maybeSingle()
+  return { data, error }
 }
 
 export function useSubscription(
@@ -71,20 +82,31 @@ export function useSubscription(
       return
     }
 
-    const { data, error } = await supabase
-      .from('subscriptions')
-      .select('tier, status, trial_ends_at')
-      .eq('user_id', userId)
-      .maybeSingle()
+    function applyRow(data: { tier: unknown; status: unknown; trial_ends_at: unknown }) {
+      const tier = (data.tier ?? 'free') as SubscriptionTier
+      const status = (data.status ?? 'active') as SubscriptionStatus
+      const trialEndsAt = data.trial_ends_at ? new Date(data.trial_ends_at as string) : null
+      const isTrialing = status === 'trialing'
+      setState({
+        tier,
+        status,
+        trialEndsAt,
+        isTrialing,
+        isLoading: false,
+        canAccess: buildCanAccess(tier, status),
+      })
+    }
+
+    const { data, error } = await fetchRow(supabase, userId)
 
     if (error) {
       console.error('[useSubscription] load error:', error)
-      setState({ tier: 'free', status: 'active', trialEndsAt: null, isTrialing: false, canAccess: buildCanAccess('free', 'active') })
+      setState({ tier: 'free', status: 'active', trialEndsAt: null, isTrialing: false, isLoading: false, canAccess: buildCanAccess('free', 'active') })
       return
     }
 
     if (!data) {
-      // First ever sign-in — start the Scholar trial
+      // First sign-in — create the Scholar trial
       try {
         const { data: sessionData } = await supabase.auth.getSession()
         const token = sessionData?.session?.access_token
@@ -100,33 +122,61 @@ export function useSubscription(
           },
         )
         if (!trialRes.ok) throw new Error(`create-trial failed: ${trialRes.status}`)
-        // Re-load after trial creation
-        await load()
+        // Fetch the row directly — no recursive load()
+        const { data: newData, error: newError } = await fetchRow(supabase, userId)
+        if (newError || !newData) throw new Error('Row not found after trial creation')
+        applyRow(newData)
       } catch (e) {
         console.error('[useSubscription] create-trial error:', e)
-        // Fall back to free so app is usable
-        setState({ tier: 'free', status: 'active', trialEndsAt: null, isTrialing: false, canAccess: buildCanAccess('free', 'active') })
+        setState({ tier: 'free', status: 'active', trialEndsAt: null, isTrialing: false, isLoading: false, canAccess: buildCanAccess('free', 'active') })
       }
       return
     }
 
-    const tier = (data.tier ?? 'free') as SubscriptionTier
-    const status = (data.status ?? 'active') as SubscriptionStatus
-    const trialEndsAt = data.trial_ends_at ? new Date(data.trial_ends_at) : null
-    const isTrialing = status === 'trialing'
-
-    setState({
-      tier,
-      status,
-      trialEndsAt,
-      isTrialing,
-      canAccess: buildCanAccess(tier, status),
-    })
+    applyRow(data)
   }, [supabase, userId])
 
   useEffect(() => {
     load()
   }, [load])
+
+  useEffect(() => {
+    if (!supabase || !userId) return
+
+    const channel = supabase
+      .channel(`subscription-${userId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'subscriptions',
+          filter: `user_id=eq.${userId}`,
+        },
+        async () => {
+          // Row changed — re-fetch to get the latest state
+          const { data, error } = await fetchRow(supabase, userId)
+          if (!error && data) {
+            const tier = (data.tier ?? 'free') as SubscriptionTier
+            const status = (data.status ?? 'active') as SubscriptionStatus
+            const trialEndsAt = data.trial_ends_at ? new Date(data.trial_ends_at as string) : null
+            setState({
+              tier,
+              status,
+              trialEndsAt,
+              isTrialing: status === 'trialing',
+              isLoading: false,
+              canAccess: buildCanAccess(tier, status),
+            })
+          }
+        },
+      )
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(channel)
+    }
+  }, [supabase, userId])
 
   return state
 }

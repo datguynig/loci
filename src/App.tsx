@@ -114,6 +114,14 @@ function AppContent() {
 
   const handleUpgrade = useCallback(() => setUpgradeOpen(true), [])
 
+  const handleManageBilling = useCallback(async () => {
+    const { openCustomerPortal } = await import('./services/subscriptionService')
+    await openCustomerPortal(async () => {
+      const { data } = await supabase.auth.getSession()
+      return data.session?.access_token ?? null
+    })
+  }, [supabase])
+
   // Raw Clerk JWT for the storage API (no Supabase template — the presign-api
   // verifies against Clerk JWKS directly).
   const getStorageToken = useCallback(() => getTokenRef.current(), [getToken]) // eslint-disable-line react-hooks/exhaustive-deps
@@ -162,10 +170,12 @@ function AppContent() {
 
   return (
     <>
-      {subscription.isTrialing && (
+      {(subscription.isTrialing || subscription.status === 'past_due') && (
         <TrialBanner
           trialEndsAt={subscription.trialEndsAt}
           onUpgrade={handleUpgrade}
+          status={subscription.status}
+          onManageBilling={handleManageBilling}
         />
       )}
       <AnimatePresence mode="wait">

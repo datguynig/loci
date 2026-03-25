@@ -1,4 +1,5 @@
 import { useState, useRef, useCallback, useEffect, type ReactNode } from 'react'
+import { PLAN_PRICES } from '../utils/plans'
 import OnboardingWelcome from './OnboardingWelcome'
 import { motion, AnimatePresence } from 'framer-motion'
 import type { SupabaseClient } from '@supabase/supabase-js'
@@ -105,7 +106,7 @@ function SubscriptionPage({
             {subscription.trialEndsAt.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
           </span>
         )}
-        {tier !== 'free' && row('Billing', tier === 'reader' ? '$7.99/mo or $79/yr' : '$13.99/mo or $139/yr')}
+        {tier !== 'free' && row('Billing', tier === 'reader' ? `${PLAN_PRICES.reader.monthly}/mo or ${PLAN_PRICES.reader.annual}/yr` : `${PLAN_PRICES.scholar.monthly}/mo or ${PLAN_PRICES.scholar.annual}/yr`)}
         {tier === 'free' && !subscription.isTrialing && row('Features', '5 books, device voice')}
       </div>
 
