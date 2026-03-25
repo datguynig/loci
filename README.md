@@ -16,6 +16,7 @@ Premium EPUB reader with cloud library, AI narration, an AI study assistant (qui
 - **Marketing landing page** — signed-out users see a full landing page (hero, narration section, feature grid, pricing, FAQ) with sign-up/sign-in via Clerk
 - **Onboarding flow** — first-time users see a welcome screen with feature highlights before uploading their first book (dismissible; state stored in `localStorage` under `loci_onboarding_done`)
 - **Reader tour** — four-step in-reader tooltip tour shown on a user's first book open (dismissible; state stored in `localStorage` under `loci_reader_tour_seen`)
+- **Subscription management** — freemium model with Free, Reader ($7.99/mo), and Scholar ($13.99/mo) tiers; 7-day Scholar trial for all new sign-ups; Stripe-powered checkout and customer portal; subscription page embedded in Clerk's user profile modal
 
 ## Stack
 
@@ -47,7 +48,7 @@ VITE_CLERK_PUBLISHABLE_KEY=pk_test_...
 VITE_SUPABASE_URL=https://your-project.supabase.co
 VITE_SUPABASE_ANON_KEY=eyJ...
 
-# Optional — ElevenLabs premium TTS
+# Optional — ElevenLabs premium TTS (Loci Narration tiers)
 VITE_ELEVENLABS_PROXY_URL=https://your-proxy.example.com
 
 # Set to "true" to suppress first-run UI (onboarding, reader tour) during E2E tests
@@ -142,11 +143,43 @@ create policy "Users manage own quiz sessions" on public.quiz_sessions
 create index quiz_sessions_user_book_idx on public.quiz_sessions(user_id, book_id);
 ```
 
+```sql
+-- Subscriptions table (managed by stripe-webhook edge function)
+create table public.subscriptions (
+  user_id                text primary key,
+  tier                   text not null default 'free',
+  status                 text not null default 'trialing',
+  trial_ends_at          timestamptz,
+  current_period_end     timestamptz,
+  stripe_customer_id     text unique,
+  stripe_subscription_id text unique,
+  updated_at             timestamptz default now()
+);
+alter table public.subscriptions enable row level security;
+create policy "users read own subscription" on public.subscriptions
+  for select using ((auth.jwt() ->> 'sub') = user_id);
+```
+
 > Migration files are also available in [`supabase/migrations/`](supabase/migrations/) if you prefer applying them via the Supabase CLI.
 
 Create two Storage buckets in your Supabase dashboard:
 - `books` — private (EPUB files)
 - `covers` — public (cover images, served via CDN)
+
+### Stripe Setup (optional — subscriptions)
+
+Stripe env vars are set in the **Supabase edge function environment**, not in `.env.local`:
+
+```bash
+STRIPE_SECRET_KEY=sk_live_...
+STRIPE_WEBHOOK_SECRET=whsec_...
+STRIPE_READER_MONTHLY_PRICE_ID=price_...
+STRIPE_READER_ANNUAL_PRICE_ID=price_...
+STRIPE_SCHOLAR_MONTHLY_PRICE_ID=price_...
+STRIPE_SCHOLAR_ANNUAL_PRICE_ID=price_...
+```
+
+Deploy the edge functions in `supabase/functions/` (`create-trial`, `create-checkout`, `create-portal`, `stripe-webhook`) and set these vars via the Supabase dashboard.
 
 ### Install and Run
 
@@ -187,7 +220,7 @@ See [docs/designsystem.md](docs/designsystem.md) for the full design system — 
 - Annotations, reading progress, and preferences are stored in your own Supabase database.
 - Browser TTS is fully on-device.
 - Proxy-backed TTS sends sentence text to your configured proxy endpoint.
-- Loci does not have its own backend — all data stays in services you control.
+- Loci uses Supabase for database and file storage (under your own account). Subscription state is managed via Stripe and synced to Supabase. EPUB processing happens entirely in the browser.
 
 ## License
 

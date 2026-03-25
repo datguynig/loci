@@ -8,34 +8,80 @@ A practical reference for every design decision in Loci. Consult this before wri
 
 **Apple meets Notion.** Clean, minimal, functional. Warm paper tones, not cold greys. Generous whitespace, not dense chrome. Every element earns its place.
 
-**Use tokens, not hardcoded values.** All colours must come from CSS custom properties so dark mode works automatically. The only exceptions are the warm panel surfaces documented below.
+**Use tokens, not hardcoded values.** All colours must come from CSS custom properties so dark mode and palette switching work automatically. The only exceptions are the warm panel surfaces documented below.
 
 **Overlay, never resize.** Panels that slide in must use `position: absolute` with `z-index` stacking — never adjust the epub viewer's width or the epubjs ResizeObserver will re-paginate the book.
 
 ---
 
-## Colour Tokens
+## Colour System
 
-Defined in `src/styles/globals.css`. Applied via `var(--token-name)`.
+Loci has two palettes. The active palette plus light/dark mode = four theme combinations. All four are defined in `src/styles/globals.css`.
 
-### Semantic Tokens
+### How Palettes Work
+
+```
+data-theme="dark"               — light/dark toggle (applied to document.documentElement)
+data-color-scheme="slate"       — Slate palette override (omit for Library default)
+```
+
+`PaletteToggle` switches `data-color-scheme`. `ThemeToggle` switches `data-theme`.
+
+### Library Palette (default)
+
+Forest green accent + antique paper backgrounds + aged gold warm accent.
 
 | Token | Light | Dark | Use |
 |---|---|---|---|
-| `--bg-primary` | `#F8F7F4` | `#111110` | Page background |
-| `--bg-secondary` | `#EFEDE8` | `#1C1C1A` | Sidebar, panels, sunken areas |
-| `--bg-surface` | `#FFFFFF` | `#242422` | Cards, modals, elevated surfaces |
-| `--text-primary` | `#1A1A1A` | `#F0EDE8` | Body copy, headings |
-| `--text-secondary` | `#6B6560` | `#8A8780` | Labels, captions, metadata |
-| `--text-tertiary` | `#B0ACA6` | `#4A4845` | Placeholder, disabled, decorative |
-| `--accent` | `#1A1A1A` | `#F0EDE8` | Primary action buttons |
-| `--accent-warm` | `#C4A882` | `#C4A882` | Focus rings, TTS waveform, highlights |
-| `--border` | `rgba(0,0,0,0.08)` | `rgba(255,255,255,0.07)` | Dividers, card edges |
-| `--shadow` | `rgba(0,0,0,0.06)` | `rgba(0,0,0,0.3)` | Base shadow tint |
+| `--bg-primary` | `#F7F2E7` | `#0A0D0B` | Page background |
+| `--bg-secondary` | `#EDE6D0` | `#111510` | Sidebar, panels, sunken areas |
+| `--bg-surface` | `#FDFBF5` | `#172019` | Cards, modals, elevated surfaces |
+| `--text-primary` | `#1A150E` | `#EDE8D5` | Body copy, headings |
+| `--text-secondary` | `#5A5040` | `#9A9078` | Labels, captions, metadata |
+| `--text-tertiary` | `#A09070` | `#3E4840` | Placeholder, disabled, decorative |
+| `--accent` | `#1D6B48` | `#4DAA7A` | Primary actions, Reader tier colour |
+| `--accent-subtle` | `rgba(29,107,72,0.08)` | `rgba(77,170,122,0.12)` | Accent tint backgrounds |
+| `--accent-warm` | `#B8952A` | `#D4AE4A` | Scholar tier colour, highlights, focus rings |
+| `--accent-warm-highlight` | `rgba(184,149,42,0.25)` | `rgba(212,174,74,0.25)` | Scholar card glow, warm tint |
+| `--border` | `rgba(29,107,72,0.12)` | `rgba(77,170,122,0.15)` | Dividers, card edges |
+| `--shadow` | `rgba(26,21,14,0.08)` | `rgba(0,0,0,0.5)` | Base shadow tint |
 
-### Named Colours (Not Yet Tokenised)
+### Slate Palette (`data-color-scheme="slate"`)
 
-These are used in specific components. Document them here so they stay consistent.
+Copper accent + warm cream/ink backgrounds. Overrides only the tokens that differ.
+
+| Token | Light | Dark | Use |
+|---|---|---|---|
+| `--bg-primary` | `#FAFAF8` | `#0F0E0C` | Page background |
+| `--bg-secondary` | `#F2F1EE` | `#1A1916` | Panels |
+| `--bg-surface` | `#FFFFFF` | `#232220` | Cards, modals |
+| `--text-primary` | `#1C1B18` | `#F0EDE5` | Body copy |
+| `--text-secondary` | `#6B645A` | `#8A8278` | Labels |
+| `--text-tertiary` | `#A09788` | `#4A4640` | Placeholder |
+| `--accent` | `#B5622A` | `#D0773A` | Primary actions |
+| `--accent-warm` | `#C8751E` | `#E0894A` | Warm highlights |
+| `--border` | `rgba(181,98,42,0.12)` | `rgba(208,119,58,0.15)` | Dividers |
+
+### Tier Colour Mapping
+
+| Tier | Token | Use |
+|---|---|---|
+| Free | `--text-tertiary` | Muted, no active accent |
+| Reader | `--accent` | Green (Library) / copper (Slate) |
+| Scholar | `--accent-warm` | Gold (Library) / warm copper (Slate) |
+
+### Semantic Error Tokens (theme-neutral)
+
+| Token | Light | Dark |
+|---|---|---|
+| `--error` | `#DC2626` | `#F87171` |
+| `--error-bg` | `#FEF2F2` | `#2D1215` |
+| `--error-border` | `#FECACA` | `#7F1D1D` |
+| `--error-text` | `#7F1D1D` | `#FCA5A5` |
+
+### Named Colours (Not Tokenised)
+
+These are used in specific components. Keep them consistent.
 
 | Value | Use |
 |---|---|
@@ -83,10 +129,11 @@ Common values: `8 / 12 / 16 / 20 / 24 / 28 / 32px`
 |---|---|
 | `6px` | Small chips, tags, badges |
 | `8px` | Note cards, action chips, popovers |
-| `10px` | Buttons, input fields, textareas |
+| `9–10px` | Buttons, input fields, textareas |
 | `12px` | Sidebar panels |
-| `16px` | AudioBar, header bar |
+| `16px` | AudioBar, header bar, pricing cards |
 | `20px` | Modals |
+| `99px` | Pill toggles, billing interval selectors |
 
 ---
 
@@ -101,7 +148,9 @@ Four levels. Use the right one — don't invent intermediates.
 | 3 — Modal | `0 32px 80px rgba(0,0,0,0.22), 0 2px 8px rgba(0,0,0,0.06)` | Modals, dialogs |
 | 4 — Cover | `0 8px 32px rgba(0,0,0,0.22), 3px 3px 0 rgba(0,0,0,0.06)` | Book cover images (3D depth effect) |
 
-Modal backdrops: `background: rgba(0,0,0,0.38)` + `backdropFilter: blur(8px)` + `-webkit-backdrop-filter: blur(8px)`.
+Modal backdrops: `background: rgba(0,0,0,0.45)` + optional `backdropFilter: blur(8px)`.
+
+Scholar card elevation (pricing): `0 0 0 4px var(--accent-warm-highlight), 0 8px 40px var(--shadow)` — outer glow ring rather than transform (keeps grid alignment).
 
 ---
 
@@ -114,7 +163,7 @@ All motion via **Framer Motion**. CSS transitions only for theme changes.
 | Pattern | Framer Motion Config | Use |
 |---|---|---|
 | Fade + slide up | `initial:{opacity:0,y:8}` → `animate:{opacity:1,y:0}` — 180ms easeOut | Toast enter/exit |
-| Fade + scale | `initial:{opacity:0,scale:0.97}` → `animate:{opacity:1,scale:1}` — spring | Modals |
+| Fade + scale | `initial:{scale:0.96,opacity:0,y:8}` → `animate:{scale:1,opacity:1,y:0}` — 200ms | Modals (UpgradeModal, BookDetailModal) |
 | Slide from right | `initial:{x:320}` → spring `stiffness:300, damping:30` | Notes panel, Sidebar |
 | Page turn | `initial:{opacity:0,x:±24}` → `animate:{opacity:1,x:0}` | EPUB chapter transitions |
 | Theme | `background-color 200ms ease-out, color 200ms ease-out` (CSS on `html/body`) | Global theme switch |
@@ -142,9 +191,12 @@ Always use overlay panels:
 | Overlay | `10` | Sidebar, chapter nav bar |
 | Notes panel | `20` | NotesPanel (inside reader) |
 | Reader chrome | `30` | Header, AudioBar |
-| Toast | `100` | Toast notifications |
+| UpgradeModal | `100` | UpgradeModal backdrop + card |
 | Modal backdrop | `200` | BookDetailModal overlay |
 | Modal card | `201` | BookDetailModal card |
+| Clerk modal | `400+` | Rendered by Clerk SDK — always above our stack |
+
+**UpgradeModal + Clerk interaction:** When triggering UpgradeModal from inside the Clerk UserProfile modal (e.g., the Subscription page), call `closeUserProfile()` first, then `setTimeout(onUpgrade, 200)` to let the Clerk modal animate out before UpgradeModal opens. This avoids z-index collision.
 
 ---
 
@@ -154,12 +206,12 @@ Always use overlay panels:
 
 ```tsx
 {
-  background: '#1A1917',       // or var(--accent)
-  color: '#FFFFFF',
-  borderRadius: 10,
-  padding: '10px 20px',
+  background: 'var(--accent)',   // or var(--accent-warm) for Scholar tier
+  color: 'var(--bg-primary)',
+  borderRadius: 9,
+  padding: '11px 0',
   fontFamily: 'var(--font-ui)',
-  fontSize: 13,
+  fontSize: 14,
   fontWeight: 600,
   border: 'none',
   cursor: 'pointer',
@@ -212,12 +264,28 @@ Bordered pill for secondary actions. Two variants:
 }
 ```
 
+### Pill Toggle (Billing interval, palette selector)
+
+```tsx
+{
+  display: 'inline-flex',
+  alignItems: 'center',
+  gap: 10,
+  background: 'var(--bg-secondary)',
+  border: '1px solid var(--border)',
+  borderRadius: 99,
+  padding: '5px 14px 5px 10px',
+  fontFamily: 'var(--font-ui)',
+  fontSize: 13,
+}
+```
+
 ### Input / Textarea
 
 ```tsx
 {
   background: 'transparent',
-  border: `1px solid ${focused ? 'rgba(196,168,130,0.6)' : '#E8E5E0'}`,
+  border: `1px solid ${focused ? 'rgba(196,168,130,0.6)' : 'var(--border)'}`,
   borderRadius: 10,
   padding: '10px 12px',
   fontFamily: 'var(--font-ui)',
@@ -234,7 +302,7 @@ Focus state toggled via `onFocus`/`onBlur` + local `focused` state (inline style
 
 ```tsx
 {
-  background: '#FAFAF8',
+  background: 'var(--bg-surface)',
   borderRadius: 8,
   padding: '10px 12px',
 }
@@ -247,20 +315,17 @@ Focus state toggled via `onFocus`/`onBlur` + local `focused` state (inline style
 {
   position: 'fixed',
   inset: 0,
-  background: 'rgba(0,0,0,0.38)',
-  backdropFilter: 'blur(8px)',
-  WebkitBackdropFilter: 'blur(8px)',
-  zIndex: 200,
+  background: 'rgba(0,0,0,0.45)',
+  zIndex: 200,  // or 100 for UpgradeModal
 }
 
 // Card
 {
-  background: 'var(--bg-surface)',
+  background: 'var(--bg-primary)',
   borderRadius: 20,
-  maxWidth: 720,
-  width: '90vw',
-  boxShadow: '0 32px 80px rgba(0,0,0,0.22), 0 2px 8px rgba(0,0,0,0.06)',
-  zIndex: 201,
+  maxWidth: 580,  // UpgradeModal; 720 for BookDetailModal
+  width: '100%',
+  boxShadow: '0 24px 80px rgba(0,0,0,0.22)',
   position: 'relative',
 }
 ```
@@ -279,7 +344,7 @@ Focus state toggled via `onFocus`/`onBlur` + local `focused` state (inline style
 // Toast item
 {
   background: 'var(--accent-warm)',
-  color: '#fff',
+  color: 'var(--bg-primary)',
   borderRadius: 10,
   padding: '10px 16px',
   fontSize: 13,
@@ -299,7 +364,7 @@ Focus state toggled via `onFocus`/`onBlur` + local `focused` state (inline style
 color: 'var(--text-primary)'
 background: 'var(--bg-surface)'
 
-// ❌ Wrong — breaks dark mode
+// ❌ Wrong — breaks dark mode and palette switching
 color: '#1A1A1A'
 background: '#FFFFFF'
 ```
@@ -314,10 +379,10 @@ These are editorial surfaces that should feel like physical paper regardless of 
 
 ## Accessibility
 
-- **Focus ring:** `outline: 2px solid var(--accent-warm); outline-offset: 2px` — set globally in `globals.css`, applies to all `:focus-visible` elements.
+- **Focus ring:** `outline: 2px solid var(--accent); outline-offset: 2px` — set globally in `globals.css`, applies to all `:focus-visible` elements.
 - **High contrast:** `@media (prefers-contrast: high)` overrides in `globals.css` — `--text-primary` goes to pure black/white.
-- **Scrollbars:** 6px, `border-radius: 3px`, transparent track, `var(--border)` thumb.
-- **ARIA:** Toast container uses `role="status" aria-live="polite"`. Modals should trap focus (Clerk handles this for auth; custom modals use `useEffect` with `Escape` key listener).
+- **Scrollbars:** 6px, `border-radius: 3px`, transparent track, `var(--text-tertiary)` thumb.
+- **ARIA:** Toast container uses `role="status" aria-live="polite"`. Modals should trap focus (Clerk handles this for auth; custom modals use `useEffect` with `Escape` key listener and `role="dialog" aria-modal={true}`).
 
 ---
 
@@ -335,13 +400,20 @@ The epub content renders inside an `iframe` managed by epubjs. CSS injected into
 
 **Inline styles are intentional here.** The landing page uses inline style objects throughout rather than shared component classes. This keeps it decoupled from the app shell and easier to iterate on independently.
 
-**Colour tokens still apply.** All colour usage follows the semantic token system (`var(--accent-warm)`, `var(--bg-primary)`, `var(--text-secondary)`, etc.). No hardcoded colour hex values are introduced — the dark mode rules from above hold here too.
+**Colour tokens still apply.** All colour usage follows the semantic token system (`var(--accent-warm)`, `var(--bg-primary)`, `var(--text-secondary)`, etc.). No hardcoded colour hex values are introduced — the dark mode and palette rules above hold here too.
 
-**Component-scoped CSS animations.** Two animations are defined inside a `<style>` tag within the component and are intentionally **not** extracted to `globals.css`, as they are only needed on this surface:
+**Pricing section specifics:**
+- Three-column card grid (Free / Reader / Scholar) with equal-height cards via `alignItems: 'stretch'`
+- Billing interval toggle is a pill (`borderRadius: 99`) using `var(--bg-surface)` background
+- Feature list items use `var(--text-primary)` for contrast (not `--text-secondary`)
+- Scholar card uses `box-shadow: 0 0 0 4px var(--accent-warm-highlight)` as an outer glow ring
+- "No credit card required" appears as a single centred line below the card grid
+
+**Component-scoped CSS animations.** Two animations are defined inside a `<style>` tag within the component:
 
 | Animation | Class / usage | Behaviour |
 |---|---|---|
 | `blink` | Inline on `<span>` in `Cursor` component | 1s step-end infinite opacity toggle; simulates a typewriter cursor |
-| `waveform-bar` | `.waveform-bar` CSS class on `<div>` elements | Animates bar height for the audio waveform visualisation used in `SmallWaveform` and the hero narration section |
+| `waveform-bar` | `.waveform-bar` CSS class on `<div>` elements | Animates bar height for the audio waveform visualisation |
 
 If either animation is ever needed outside the landing page, move them to `globals.css` at that point.
