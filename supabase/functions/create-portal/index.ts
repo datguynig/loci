@@ -7,31 +7,30 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
-function decodeJwtPayload(token: string): Record<string, unknown> {
-  const parts = token.split('.')
-  if (parts.length < 2) return {}
-  try {
-    return JSON.parse(atob(parts[1].replace(/-/g, '+').replace(/_/g, '/')))
-  } catch {
-    return {}
-  }
-}
-
 serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
 
   const authHeader = req.headers.get('Authorization') ?? ''
-  const token = authHeader.replace('Bearer ', '')
+  const token = authHeader.replace(/^Bearer\s+/i, '').trim()
   if (!token) return new Response('Unauthorized', { status: 401, headers: corsHeaders })
 
-  const payload = decodeJwtPayload(token)
-  const userId = payload.sub as string | undefined
-  if (!userId) return new Response('Unauthorized', { status: 401, headers: corsHeaders })
-
-  const stripeKey   = Deno.env.get('STRIPE_SECRET_KEY')!
-  const appUrl      = Deno.env.get('APP_URL') ?? 'http://localhost:5173'
+  const stripeKey   = Deno.env.get('STRIPE_SECRET_KEY')
   const supabaseUrl = Deno.env.get('SUPABASE_URL')!
-  const serviceKey  = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+  const serviceKey  = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
+  const appUrl      = Deno.env.get('APP_URL') ?? 'http://localhost:5173'
+
+  if (!stripeKey || !serviceKey) {
+    return new Response('Server misconfiguration', { status: 500, headers: corsHeaders })
+  }
+
+  // Verify JWT using Supabase auth (validates against configured JWT secret)
+  const anonKey = Deno.env.get('SUPABASE_ANON_KEY')!
+  const userClient = createClient(supabaseUrl, anonKey, {
+    global: { headers: { Authorization: `Bearer ${token}` } },
+  })
+  const { data: { user }, error: authError } = await userClient.auth.getUser()
+  if (authError || !user) return new Response('Unauthorized', { status: 401, headers: corsHeaders })
+  const userId = user.id
 
   const db = createClient(supabaseUrl, serviceKey)
   const { data: sub } = await db

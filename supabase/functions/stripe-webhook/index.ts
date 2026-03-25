@@ -78,7 +78,7 @@ serve(async (req) => {
 
     const updatedAt = new Date().toISOString()
 
-    await db.from('subscriptions').upsert({
+    const { error: upsertError } = await db.from('subscriptions').upsert({
       user_id:                userId,
       tier,
       status,
@@ -88,6 +88,10 @@ serve(async (req) => {
       stripe_subscription_id: sub.id,
       updated_at:             updatedAt,
     }, { onConflict: 'stripe_subscription_id' })
+    if (upsertError) {
+      console.error('[stripe-webhook] upsert error:', upsertError)
+      return new Response('DB error', { status: 500 })
+    }
   }
 
   else if (event.type === 'customer.subscription.deleted') {
@@ -95,26 +99,29 @@ serve(async (req) => {
     const userId = sub.metadata?.user_id
     if (!userId) return new Response('ok')
 
-    await db.from('subscriptions')
+    const { error: updateError } = await db.from('subscriptions')
       .update({ tier: 'free', status: 'canceled', updated_at: new Date().toISOString() })
       .eq('user_id', userId)
+    if (updateError) console.error('[stripe-webhook] delete-update error:', updateError)
   }
 
   else if (event.type === 'invoice.payment_succeeded') {
     const inv = obj as { subscription: string }
     if (inv.subscription) {
-      await db.from('subscriptions')
+      const { error: payErr } = await db.from('subscriptions')
         .update({ status: 'active', updated_at: new Date().toISOString() })
         .eq('stripe_subscription_id', inv.subscription)
+      if (payErr) console.error('[stripe-webhook] payment-succeeded update error:', payErr)
     }
   }
 
   else if (event.type === 'invoice.payment_failed') {
     const inv = obj as { subscription: string }
     if (inv.subscription) {
-      await db.from('subscriptions')
+      const { error: payErr } = await db.from('subscriptions')
         .update({ status: 'past_due', updated_at: new Date().toISOString() })
         .eq('stripe_subscription_id', inv.subscription)
+      if (payErr) console.error('[stripe-webhook] payment-failed update error:', payErr)
     }
   }
 

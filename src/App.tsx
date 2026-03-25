@@ -199,7 +199,10 @@ function AppContent() {
         onClose={() => setUpgradeOpen(false)}
         onCheckout={async (tier, interval) => {
           const { createCheckoutSession } = await import('./services/subscriptionService')
-          await createCheckoutSession(tier, interval)
+          await createCheckoutSession(tier, interval, async () => {
+            const { data } = await supabase.auth.getSession()
+            return data.session?.access_token ?? null
+          })
         }}
       />
     </>
