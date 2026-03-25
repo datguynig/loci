@@ -181,6 +181,7 @@ export default function AudioBar({
   const canNarrateP = subscription?.canAccess('loci-narration-pro') ?? true
 
   const handlePlayPause = () => {
+    if (subscription?.isLoading) return
     if (!canNarrate) {
       onUpgrade?.()
       return
@@ -322,6 +323,8 @@ export default function AudioBar({
               <select value={selectedBrowserVoice?.name ?? ''} onChange={(e) => { const v = browserVoices.find((bv) => bv.name === e.target.value); if (v) setBrowserVoice(v) }} aria-label="Select voice" style={{ ...selectStyle, maxWidth: 120 }}>
                 {browserVoices.map((v) => <option key={v.name} value={v.name}>{v.name}</option>)}
               </select>
+            ) : subscription?.isLoading ? (
+              <span style={{ fontFamily: 'var(--font-ui)', fontSize: 11, color: 'var(--text-tertiary)', opacity: 0.5 }}>...</span>
             ) : !canNarrate && (
               <span style={{ fontFamily: 'var(--font-ui)', fontSize: 11, color: 'var(--text-tertiary)' }}>Browser voice</span>
             )}

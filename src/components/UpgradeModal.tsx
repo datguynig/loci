@@ -1,6 +1,7 @@
 // src/components/UpgradeModal.tsx
 import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
+import { PLAN_PRICES } from '../utils/plans'
 
 export type BillingInterval = 'monthly' | 'annual'
 
@@ -23,8 +24,8 @@ export default function UpgradeModal({ isOpen, onClose, onCheckout, defaultTier 
     return () => document.removeEventListener('keydown', onKey)
   }, [isOpen, onClose])
 
-  const readerPrice  = billingInterval === 'monthly' ? '$7.99' : '$6.58'
-  const scholarPrice = billingInterval === 'monthly' ? '$13.99' : '$11.58'
+  const readerPrice  = billingInterval === 'monthly' ? PLAN_PRICES.reader.monthly : PLAN_PRICES.reader.annualMonthly
+  const scholarPrice = billingInterval === 'monthly' ? PLAN_PRICES.scholar.monthly : PLAN_PRICES.scholar.annualMonthly
 
   async function handleCTA(tier: 'reader' | 'scholar') {
     setLoading(tier)
