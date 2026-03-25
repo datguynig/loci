@@ -91,7 +91,7 @@ serve(async (req) => {
       stripe_customer_id:     sub.customer as string,
       stripe_subscription_id: sub.id,
       updated_at:             updatedAt,
-    }, { onConflict: 'stripe_subscription_id' })
+    }, { onConflict: 'user_id' })
     if (upsertError) {
       console.error('[stripe-webhook] upsert error:', upsertError)
       return new Response('DB error', { status: 500 })

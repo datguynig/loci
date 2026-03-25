@@ -1,6 +1,10 @@
 import { useState, useEffect, useCallback } from 'react'
 import type { SupabaseClient } from '@supabase/supabase-js'
 
+// Module-level set prevents concurrent create-trial calls for the same user
+// across multiple component instances (multiple tabs, React Strict Mode double-invoke).
+const trialInFlight = new Set<string>()
+
 export type SubscriptionTier = 'free' | 'reader' | 'scholar'
 export type SubscriptionStatus = 'loading' | 'trialing' | 'active' | 'canceled' | 'past_due'
 
@@ -109,6 +113,11 @@ export function useSubscription(
 
     if (!data) {
       // First sign-in — create the Scholar trial (Edge Function validates JWT via Supabase auth.getUser)
+      if (trialInFlight.has(userId)) {
+        // Another call for this user is already in progress; skip to avoid duplicate Stripe objects.
+        return
+      }
+      trialInFlight.add(userId)
       try {
         const token = getSupabaseAccessToken
           ? await getSupabaseAccessToken()
@@ -132,6 +141,8 @@ export function useSubscription(
       } catch (e) {
         console.error('[useSubscription] create-trial error:', e)
         setState({ tier: 'free', status: 'active', trialEndsAt: null, isTrialing: false, isLoading: false, canAccess: buildCanAccess('free', 'active') })
+      } finally {
+        trialInFlight.delete(userId)
       }
       return
     }

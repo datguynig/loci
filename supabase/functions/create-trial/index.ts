@@ -31,6 +31,23 @@ serve(async (req) => {
 
   const db = createClient(supabaseUrl, supabaseService)
 
+  // Idempotency guard — if a subscription row already exists for this user,
+  // return immediately without touching Stripe. This prevents duplicate customers
+  // and orphaned subscriptions from concurrent calls (multiple tabs, Strict Mode, etc.)
+  // and from re-trial attempts after a DB row was manually deleted.
+  const { data: existingRow } = await db
+    .from('subscriptions')
+    .select('stripe_customer_id, stripe_subscription_id, status')
+    .eq('user_id', userId)
+    .maybeSingle()
+
+  if (existingRow) {
+    console.log('[create-trial] row already exists for user, skipping', userId)
+    return new Response(JSON.stringify({ ok: true, skipped: true }), {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    })
+  }
+
   // Create Stripe customer
   const customerRes = await fetch('https://api.stripe.com/v1/customers', {
     method: 'POST',
@@ -70,7 +87,9 @@ serve(async (req) => {
   }
   const sub = await subRes.json() as { id: string; status: string; trial_end: number | null; current_period_end: number }
 
-  // Atomic upsert — concurrent requests will not create duplicate DB rows
+  // Upsert — last-write-wins on user_id. The idempotency check above means
+  // we should never reach here twice for the same user, but the upsert keeps
+  // this safe even in extreme race conditions.
   const { error: dbError } = await db.from('subscriptions').upsert(
     {
       user_id:                userId,
@@ -82,7 +101,7 @@ serve(async (req) => {
       stripe_subscription_id: sub.id,
       updated_at:             new Date().toISOString(),
     },
-    { onConflict: 'user_id', ignoreDuplicates: true }
+    { onConflict: 'user_id' }
   )
   if (dbError) {
     console.error('[create-trial] db upsert error:', dbError)

@@ -166,9 +166,19 @@ Create two Storage buckets in your Supabase dashboard:
 - `books` — private (EPUB files)
 - `covers` — public (cover images, served via CDN)
 
+### Clerk JWT Template (required for subscriptions and storage)
+
+The Edge Functions and the storage presign API verify the caller using a Clerk JWT signed with Supabase's JWT secret. You must create a JWT template named **exactly `supabase`** in Clerk:
+
+1. Clerk Dashboard → **JWT Templates** → **New template** → choose **Supabase**.
+2. Set the signing algorithm to **HS256** and paste your Supabase **JWT secret** (Supabase Dashboard → Project Settings → API → JWT Secret).
+3. The template name must be `supabase` — the client calls `getToken({ template: 'supabase' })`.
+
+Without this template, all Edge Function calls return 401, trial creation silently falls back to free, and checkout/portal fail.
+
 ### Stripe Setup (optional — subscriptions)
 
-Stripe env vars are set in the **Supabase edge function environment**, not in `.env.local`:
+Stripe env vars are set in the **Supabase edge function environment** (Supabase Dashboard → Edge Functions → Secrets), **not** in `.env.local`:
 
 ```bash
 STRIPE_SECRET_KEY=sk_live_...
@@ -177,9 +187,18 @@ STRIPE_READER_MONTHLY_PRICE_ID=price_...
 STRIPE_READER_ANNUAL_PRICE_ID=price_...
 STRIPE_SCHOLAR_MONTHLY_PRICE_ID=price_...
 STRIPE_SCHOLAR_ANNUAL_PRICE_ID=price_...
+APP_URL=https://your-production-domain.com   # used for checkout/portal return URLs
 ```
 
+> Without `APP_URL`, successful Stripe checkouts and billing portal sessions will redirect back to `http://localhost:5173` in production.
+
 Deploy the edge functions in `supabase/functions/` (`create-trial`, `create-checkout`, `create-portal`, `stripe-webhook`) and set these vars via the Supabase dashboard.
+
+In Stripe Dashboard, set the webhook endpoint to:
+```
+https://<your-supabase-project>.supabase.co/functions/v1/stripe-webhook
+```
+and subscribe to: `customer.subscription.created`, `customer.subscription.updated`, `customer.subscription.deleted`, `invoice.payment_succeeded`, `invoice.payment_failed`.
 
 ### Install and Run
 
